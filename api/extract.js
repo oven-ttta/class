@@ -106,7 +106,9 @@ export default async function handler(req, res) {
     { type: 'text', text: `Transcribe the class timetable and exam table in ${images.length > 1 ? 'these images' : 'this image'}.` },
   ];
 
-  const client = new Anthropic();
+  // A key that is not scoped to a workspace must name one; set ANTHROPIC_WORKSPACE_ID in Vercel for that case.
+  const workspace = process.env.ANTHROPIC_WORKSPACE_ID;
+  const client = new Anthropic(workspace ? { defaultHeaders: { 'anthropic-workspace-id': workspace } } : {});
   try {
     const stream = client.beta.messages.stream({
       model: 'claude-opus-5-5',
@@ -134,6 +136,9 @@ export default async function handler(req, res) {
   } catch (err) {
     if (err instanceof Anthropic.RateLimitError) return send(res, 429, { error: 'มีคนใช้งานเยอะ ลองใหม่อีกครั้งในอีกสักครู่' });
     if (err instanceof Anthropic.AuthenticationError) return send(res, 500, { error: 'ANTHROPIC_API_KEY ไม่ถูกต้อง ตรวจสอบใน Vercel' });
+    if (err instanceof Anthropic.BadRequestError && /workspace/i.test(err.message)) {
+      return send(res, 500, { error: 'API key นี้ไม่ได้ผูกกับ workspace: ตั้งค่า ANTHROPIC_WORKSPACE_ID ใน Vercel หรือสร้าง key ใหม่ภายใน workspace' });
+    }
     if (err instanceof Anthropic.APIError) return send(res, 502, { error: `AI ตอบกลับผิดพลาด (${err.status ?? 'network'}) ลองใหม่อีกครั้ง` });
     if (err instanceof SyntaxError) return send(res, 502, { error: 'AI ส่งข้อมูลกลับมาไม่ครบ ลองใหม่อีกครั้ง' });
     console.error(err);

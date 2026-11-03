@@ -28,7 +28,8 @@ URL และ publishable key ใส่ไว้ใน `api/config.js` แล้
 ### 3. ระบบอัปโหลดรูปตาราง (AI กรอกให้)
 1. สร้าง API key ที่ https://platform.claude.com/settings/keys
 2. ใน Vercel → Project → **Settings → Environment Variables** เพิ่ม `ANTHROPIC_API_KEY` = key ที่ได้
-3. กด **Redeploy**
+3. ถ้า key ไม่ได้สร้างภายใน workspace (ขึ้นข้อความเรื่อง workspace) ให้เพิ่ม `ANTHROPIC_WORKSPACE_ID` = ID ของ workspace (ขึ้นต้นด้วย `wrkspc_`) ด้วย
+4. กด **Redeploy**
 
 จากนั้นกดปุ่ม “อัปโหลดรูปตาราง (AI กรอกให้)” ใส่ชื่อ เลือกรูปหน้าตารางเรียน/สอบ (สูงสุด 4 รูป) แล้วตรวจข้อมูลก่อนบันทึก
 ค่าใช้จ่ายคิดตามการใช้งาน API ของ Anthropic (ประมาณ 3–8 บาทต่อการอ่านหนึ่งครั้ง ขึ้นกับจำนวนรูปและจำนวนวิชา)
