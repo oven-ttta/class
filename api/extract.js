@@ -107,19 +107,25 @@ async function geminiFetch(path, key, body) {
   return { ok: r.ok, status: r.status, json: j, message: j?.error?.message || '' };
 }
 
-// When the configured model name is gone, pick a current Flash model that this key can use.
-async function findFlashModel(key) {
+// Flash models this key can use, newest first; full Flash before Flash-Lite.
+async function listFlashModels(key) {
   const { ok, json } = await geminiFetch('models?pageSize=200', key);
-  if (!ok) return null;
+  if (!ok) return [];
   const names = (json.models || [])
     .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
     .map((m) => m.name.replace(/^models\//, ''))
-    .filter((n) => /flash/.test(n) && !/(lite|image|tts|live|audio|thinking|exp|preview)/.test(n));
-  return names.sort().reverse()[0] || null;
+    .filter((n) => /flash/.test(n) && !/(image|tts|live|audio|thinking|exp|embedding)/.test(n));
+  const rank = (n) => (/lite/.test(n) ? 1 : 0) + (/preview/.test(n) ? 2 : 0);
+  return names.sort((x, y) => rank(x) - rank(y) || y.localeCompare(x));
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const BUSY = new Set([429, 500, 503, 504]);
+const DEADLINE_MS = 100_000; // stay inside the 120 s function limit
+
 async function extractWithGemini(images, key) {
-  let model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+  const started = Date.now();
+  const first = process.env.GEMINI_MODEL || 'gemini-flash-latest';
   const body = {
     systemInstruction: { parts: [{ text: SYSTEM }] },
     contents: [{
@@ -131,14 +137,34 @@ async function extractWithGemini(images, key) {
     }],
     generationConfig: { responseMimeType: 'application/json', responseSchema: toGeminiSchema(SCHEMA), maxOutputTokens: 32000 },
   };
-  let r = await geminiFetch(`models/${model}:generateContent`, key, body);
-  if (r.status === 404) {
-    const alt = await findFlashModel(key);
-    if (alt && alt !== model) { model = alt; r = await geminiFetch(`models/${model}:generateContent`, key, body); }
+
+  // Try the configured model (one retry when busy), then other Flash models when it is busy or missing.
+  let queue = [first, first];
+  let others = null;
+  let model = first;
+  let r = null;
+  const tried = new Set();
+  while (queue.length && Date.now() - started < DEADLINE_MS) {
+    model = queue.shift();
+    if (tried.has(model) && model !== first) continue;
+    if (tried.has(model)) await sleep(2500);
+    tried.add(model);
+    r = await geminiFetch(`models/${model}:generateContent`, key, body);
+    if (r.ok) break;
+    const quota = r.status === 429 && /quota|exhausted|limit/i.test(r.message);
+    if (r.status !== 404 && !BUSY.has(r.status)) break;
+    if (r.status === 404 && model === first) queue = queue.filter((m) => m !== first);
+    console.warn('Gemini', r.status, model, r.message);
+    if (!others) {
+      others = (await listFlashModels(key)).filter((m) => m !== first);
+      queue.push(...others.slice(0, 3));
+    }
+    if (quota && !queue.length) break;
   }
   if (!r.ok) {
     console.error('Gemini error', r.status, model, r.message);
     if (r.status === 429) throw new AIError(429, 'ใช้โควตาฟรีของ Gemini หมดแล้ว รอสักครู่ (หรือพรุ่งนี้) แล้วลองใหม่', r.message);
+    if (BUSY.has(r.status)) throw new AIError(503, 'ตอนนี้ AI ฟรีของ Google มีคนใช้เยอะ ลองใหม่อีกครั้งในอีก 1–2 นาที', r.message);
     if (r.status === 400 && /api key/i.test(r.message)) throw new AIError(500, 'GEMINI_API_KEY ไม่ถูกต้อง ตรวจสอบใน Vercel', r.message);
     if (r.status === 403) throw new AIError(500, 'GEMINI_API_KEY ไม่มีสิทธิ์ใช้งาน Gemini API', r.message);
     if (r.status === 404) throw new AIError(502, `ไม่พบโมเดล ${model}: ตั้งค่า GEMINI_MODEL ใน Vercel`, r.message);
