@@ -903,7 +903,7 @@ function openUpload(){
   const draw=(ov,close)=>{
     const m=ov.querySelector('.modal'),same=state.people.find(p=>p.name.trim()&&p.name.trim()===st.name.trim());
     const avail=apiCfg===null?`<div class="mclash full">ระบบ AI ใช้ได้เฉพาะบนเว็บที่ deploy บน Vercel (หน้านี้ยังเรียก /api/extract ไม่ได้)</div>`
-      :apiCfg.ai===false?`<div class="mclash full">ยังไม่ได้ตั้งค่า ANTHROPIC_API_KEY ใน Vercel ระบบ AI จึงยังใช้ไม่ได้</div>`:'';
+      :apiCfg.ai===false?`<div class="mclash full">ยังไม่ได้ตั้งค่า GEMINI_API_KEY (ฟรี) หรือ ANTHROPIC_API_KEY ใน Vercel ระบบ AI จึงยังใช้ไม่ได้</div>`:'';
     if(st.step==='pick'){
       m.innerHTML=`<h2>อัปโหลดรูปตารางเรียน</h2>
         <p class="note" style="margin:0">ใส่ชื่อ แล้วเลือกรูปหน้า “ตารางเรียน/สอบ” จากระบบทะเบียน (แคปหน้าจอได้เลย ใส่ได้สูงสุด 4 รูป เช่น ตารางเรียน + ตารางสอบ) AI จะอ่านแล้วกรอกวิชาและวันสอบให้</p>

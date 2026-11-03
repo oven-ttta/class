@@ -1,5 +1,5 @@
-// Reads timetable screenshots (e.g. from reg.sut.ac.th) with Claude and returns structured classes and exams.
-// Needs the ANTHROPIC_API_KEY environment variable in Vercel.
+// Reads timetable screenshots (e.g. from reg.sut.ac.th) with AI and returns structured classes and exams.
+// Set GEMINI_API_KEY (free tier) or ANTHROPIC_API_KEY in Vercel; AI_PROVIDER=gemini|anthropic forces one.
 import Anthropic from '@anthropic-ai/sdk';
 
 const DAYS = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
@@ -74,6 +74,83 @@ The exam table (ตารางสอบ) lists code, English and Thai names, gr
 
 Copy codes, rooms and Thai text exactly as printed. Never invent a class that is not in the images. If several images are given, they belong to the same student: merge them and do not duplicate entries.`;
 
+
+// ---------- Google Gemini (has a free tier: key from https://aistudio.google.com/apikey) ----------
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+
+class AIError extends Error {
+  constructor(status, error, detail = '') { super(error); this.status = status; this.error = error; this.detail = detail; }
+}
+
+// Gemini's responseSchema uses an OpenAPI subset: upper-case types and no additionalProperties.
+function toGeminiSchema(node) {
+  if (Array.isArray(node)) return node.map(toGeminiSchema);
+  if (!node || typeof node !== 'object') return node;
+  const out = {};
+  for (const [k, v] of Object.entries(node)) {
+    if (k === 'additionalProperties') continue;
+    if (k === 'type') out.type = String(v).toUpperCase();
+    else if (k === 'properties') out.properties = Object.fromEntries(Object.entries(v).map(([pk, pv]) => [pk, toGeminiSchema(pv)]));
+    else out[k] = toGeminiSchema(v);
+  }
+  return out;
+}
+
+async function geminiFetch(path, key, body) {
+  const r = await fetch(`${GEMINI_BASE}/${path}`, {
+    method: body ? 'POST' : 'GET',
+    headers: { 'x-goog-api-key': key, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  let j = null;
+  try { j = await r.json(); } catch { /* non-JSON error page */ }
+  return { ok: r.ok, status: r.status, json: j, message: j?.error?.message || '' };
+}
+
+// When the configured model name is gone, pick a current Flash model that this key can use.
+async function findFlashModel(key) {
+  const { ok, json } = await geminiFetch('models?pageSize=200', key);
+  if (!ok) return null;
+  const names = (json.models || [])
+    .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map((m) => m.name.replace(/^models\//, ''))
+    .filter((n) => /flash/.test(n) && !/(lite|image|tts|live|audio|thinking|exp|preview)/.test(n));
+  return names.sort().reverse()[0] || null;
+}
+
+async function extractWithGemini(images, key) {
+  let model = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+  const body = {
+    systemInstruction: { parts: [{ text: SYSTEM }] },
+    contents: [{
+      role: 'user',
+      parts: [
+        ...images.map((img) => ({ inlineData: { mimeType: img.mediaType, data: img.data } })),
+        { text: `Transcribe the class timetable and exam table in ${images.length > 1 ? 'these images' : 'this image'}. Reply with JSON only.` },
+      ],
+    }],
+    generationConfig: { responseMimeType: 'application/json', responseSchema: toGeminiSchema(SCHEMA), maxOutputTokens: 32000 },
+  };
+  let r = await geminiFetch(`models/${model}:generateContent`, key, body);
+  if (r.status === 404) {
+    const alt = await findFlashModel(key);
+    if (alt && alt !== model) { model = alt; r = await geminiFetch(`models/${model}:generateContent`, key, body); }
+  }
+  if (!r.ok) {
+    console.error('Gemini error', r.status, model, r.message);
+    if (r.status === 429) throw new AIError(429, 'ใช้โควตาฟรีของ Gemini หมดแล้ว รอสักครู่ (หรือพรุ่งนี้) แล้วลองใหม่', r.message);
+    if (r.status === 400 && /api key/i.test(r.message)) throw new AIError(500, 'GEMINI_API_KEY ไม่ถูกต้อง ตรวจสอบใน Vercel', r.message);
+    if (r.status === 403) throw new AIError(500, 'GEMINI_API_KEY ไม่มีสิทธิ์ใช้งาน Gemini API', r.message);
+    if (r.status === 404) throw new AIError(502, `ไม่พบโมเดล ${model}: ตั้งค่า GEMINI_MODEL ใน Vercel`, r.message);
+    throw new AIError(502, `AI ตอบกลับผิดพลาด (${r.status})`, r.message);
+  }
+  const cand = r.json?.candidates?.[0];
+  if (!cand) throw new AIError(422, 'AI อ่านรูปนี้ไม่ได้ ลองใช้รูปหน้าตารางเรียนจากระบบทะเบียน', r.json?.promptFeedback?.blockReason || '');
+  if (cand.finishReason === 'MAX_TOKENS') throw new AIError(422, 'ตารางยาวเกินไป ลองอัปโหลดทีละรูป');
+  const text = (cand.content?.parts || []).map((p) => p.text || '').join('');
+  try { return JSON.parse(text); } catch { throw new AIError(502, 'AI ส่งข้อมูลกลับมาไม่ครบ ลองใหม่อีกครั้ง', cand.finishReason || ''); }
+}
+
 function apiMessage(err) {
   return err?.error?.error?.message || err?.message || '';
 }
@@ -87,8 +164,11 @@ function send(res, status, body) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return send(res, 405, { error: 'ใช้ได้เฉพาะ POST' });
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return send(res, 503, { error: 'ยังไม่ได้ตั้งค่า ANTHROPIC_API_KEY ใน Vercel (Settings → Environment Variables) แล้ว Redeploy' });
+  // AI_PROVIDER=gemini|anthropic picks one explicitly; otherwise the free Gemini key wins when both are set.
+  const env = process.env;
+  const provider = env.AI_PROVIDER || (env.GEMINI_API_KEY ? 'gemini' : env.ANTHROPIC_API_KEY ? 'anthropic' : '');
+  if (!provider) {
+    return send(res, 503, { error: 'ยังไม่ได้ตั้งค่า GEMINI_API_KEY (ฟรี) หรือ ANTHROPIC_API_KEY ใน Vercel (Settings → Environment Variables) แล้ว Redeploy' });
   }
 
   let body = req.body;
@@ -109,6 +189,25 @@ export default async function handler(req, res) {
     ...images.map((img) => ({ type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } })),
     { type: 'text', text: `Transcribe the class timetable and exam table in ${images.length > 1 ? 'these images' : 'this image'}.` },
   ];
+
+  const finish = (data) => {
+    if (!data.is_timetable || !Array.isArray(data.classes) || !data.classes.length) {
+      return send(res, 422, { error: 'ไม่พบตารางเรียนในรูป ลองใช้รูปที่เห็นตารางชัด ๆ', detail: data.notes || '' });
+    }
+    return send(res, 200, { data });
+  };
+
+  if (provider === 'gemini') {
+    if (!env.GEMINI_API_KEY) return send(res, 503, { error: 'AI_PROVIDER เป็น gemini แต่ยังไม่ได้ตั้งค่า GEMINI_API_KEY' });
+    try {
+      return finish(await extractWithGemini(images, env.GEMINI_API_KEY));
+    } catch (err) {
+      if (err instanceof AIError) return send(res, err.status, { error: err.error, detail: err.detail });
+      console.error(err);
+      return send(res, 502, { error: 'เชื่อมต่อ Gemini ไม่ได้ ลองใหม่อีกครั้ง' });
+    }
+  }
+  if (!env.ANTHROPIC_API_KEY) return send(res, 503, { error: 'AI_PROVIDER เป็น anthropic แต่ยังไม่ได้ตั้งค่า ANTHROPIC_API_KEY' });
 
   // A key that is not scoped to a workspace must name one; set ANTHROPIC_WORKSPACE_ID in Vercel for that case.
   const workspace = process.env.ANTHROPIC_WORKSPACE_ID;
@@ -139,11 +238,7 @@ export default async function handler(req, res) {
       return send(res, 422, { error: 'ตารางยาวเกินไป ลองอัปโหลดทีละรูป' });
     }
     const text = message.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-    const data = JSON.parse(text);
-    if (!data.is_timetable || !data.classes.length) {
-      return send(res, 422, { error: 'ไม่พบตารางเรียนในรูป ลองใช้รูปที่เห็นตารางชัด ๆ', notes: data.notes });
-    }
-    return send(res, 200, { data });
+    return finish(JSON.parse(text));
   } catch (err) {
     if (err instanceof Anthropic.RateLimitError) return send(res, 429, { error: 'มีคนใช้งานเยอะ ลองใหม่อีกครั้งในอีกสักครู่' });
     if (err instanceof Anthropic.AuthenticationError) return send(res, 500, { error: 'ANTHROPIC_API_KEY ไม่ถูกต้อง ตรวจสอบใน Vercel' });
