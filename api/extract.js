@@ -74,6 +74,10 @@ The exam table (ตารางสอบ) lists code, English and Thai names, gr
 
 Copy codes, rooms and Thai text exactly as printed. Never invent a class that is not in the images. If several images are given, they belong to the same student: merge them and do not duplicate entries.`;
 
+function apiMessage(err) {
+  return err?.error?.error?.message || err?.message || '';
+}
+
 function send(res, status, body) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -109,17 +113,24 @@ export default async function handler(req, res) {
   // A key that is not scoped to a workspace must name one; set ANTHROPIC_WORKSPACE_ID in Vercel for that case.
   const workspace = process.env.ANTHROPIC_WORKSPACE_ID;
   const client = new Anthropic(workspace ? { defaultHeaders: { 'anthropic-workspace-id': workspace } } : {});
+  const request = {
+    model: 'claude-opus-5-5',
+    max_tokens: 32000,
+    system: SYSTEM,
+    output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
+    messages: [{ role: 'user', content }],
+  };
+  const withFallback = { ...request, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' };
   try {
-    const stream = client.beta.messages.stream({
-      model: 'claude-opus-5-5',
-      max_tokens: 32000,
-      betas: ['server-side-fallback-2026-07-01'],
-      fallbacks: 'default',
-      system: SYSTEM,
-      output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
-      messages: [{ role: 'user', content }],
-    });
-    const message = await stream.finalMessage();
+    let message;
+    try {
+      message = await client.beta.messages.stream(withFallback).finalMessage();
+    } catch (err) {
+      // Some accounts or orgs cannot use server-side fallbacks yet; retry the same request without them.
+      if (!(err instanceof Anthropic.BadRequestError) || !/fallback|beta/i.test(apiMessage(err))) throw err;
+      console.warn('Retrying without fallbacks:', apiMessage(err));
+      message = await client.beta.messages.stream(request).finalMessage();
+    }
 
     if (message.stop_reason === 'refusal') {
       return send(res, 422, { error: 'AI อ่านรูปนี้ไม่ได้ ลองใช้รูปหน้าตารางเรียนจากระบบทะเบียน' });
@@ -136,10 +147,23 @@ export default async function handler(req, res) {
   } catch (err) {
     if (err instanceof Anthropic.RateLimitError) return send(res, 429, { error: 'มีคนใช้งานเยอะ ลองใหม่อีกครั้งในอีกสักครู่' });
     if (err instanceof Anthropic.AuthenticationError) return send(res, 500, { error: 'ANTHROPIC_API_KEY ไม่ถูกต้อง ตรวจสอบใน Vercel' });
-    if (err instanceof Anthropic.BadRequestError && /workspace/i.test(err.message)) {
-      return send(res, 500, { error: 'API key นี้ไม่ได้ผูกกับ workspace: ตั้งค่า ANTHROPIC_WORKSPACE_ID ใน Vercel หรือสร้าง key ใหม่ภายใน workspace' });
+    if (err instanceof Anthropic.APIError) {
+      const detail = apiMessage(err);
+      console.error('Claude API error', err.status, detail);
+      if (/workspace/i.test(detail)) {
+        return send(res, 500, { error: 'API key นี้ไม่ได้ผูกกับ workspace: ตั้งค่า ANTHROPIC_WORKSPACE_ID ใน Vercel หรือสร้าง key ใหม่ภายใน workspace', detail });
+      }
+      if (/credit balance|billing|purchase credits/i.test(detail)) {
+        return send(res, 402, { error: 'เครดิตในบัญชี Anthropic ไม่พอ: เติมเครดิตที่ platform.claude.com → Settings → Billing แล้วลองใหม่', detail });
+      }
+      if (/model/i.test(detail) && /not found|access|permission|available/i.test(detail)) {
+        return send(res, 502, { error: 'บัญชีนี้ยังใช้โมเดล AI ที่ตั้งไว้ไม่ได้', detail });
+      }
+      if (/image/i.test(detail)) {
+        return send(res, 400, { error: 'รูปนี้ใช้ไม่ได้ ลองแคปหน้าจอใหม่เป็น PNG หรือ JPG', detail });
+      }
+      return send(res, 502, { error: `AI ตอบกลับผิดพลาด (${err.status ?? 'network'})`, detail });
     }
-    if (err instanceof Anthropic.APIError) return send(res, 502, { error: `AI ตอบกลับผิดพลาด (${err.status ?? 'network'}) ลองใหม่อีกครั้ง` });
     if (err instanceof SyntaxError) return send(res, 502, { error: 'AI ส่งข้อมูลกลับมาไม่ครบ ลองใหม่อีกครั้ง' });
     console.error(err);
     return send(res, 500, { error: 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง' });

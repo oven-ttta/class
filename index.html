@@ -956,7 +956,7 @@ function openUpload(){
       try{
         const r=await fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images:st.images.map(({data,mediaType})=>({data,mediaType}))}),signal:ac.signal});
         let j=null;try{j=await r.json()}catch(e){}
-        if(!r.ok||!j||!j.data)throw new Error((j&&j.error)||(r.status===404?'ระบบ AI ใช้ได้เฉพาะบนเว็บที่ deploy บน Vercel':'อ่านตารางไม่สำเร็จ ('+r.status+') ลองใหม่อีกครั้ง'));
+        if(!r.ok||!j||!j.data)throw new Error((j&&j.error&&(j.error+(j.detail?' · รายละเอียดจากระบบ: '+j.detail:'')))||(r.status===404?'ระบบ AI ใช้ได้เฉพาะบนเว็บที่ deploy บน Vercel':'อ่านตารางไม่สำเร็จ ('+r.status+') ลองใหม่อีกครั้ง'));
         st.result=personFromAI(st.name.trim(),j.data);st.notes=j.data.notes||'';
         if(!st.result.classes.length)throw new Error('AI ไม่พบคาบเรียนในรูป ลองใช้รูปที่เห็นตารางชัด ๆ');
         st.mode=state.people.some(p=>p.name.trim()===st.name.trim())?'replace':'new';st.step='review';
