@@ -16,6 +16,7 @@
   --bg:#eef0f5; --surface:#ffffff; --ink:#1d2230; --muted:#5b6274; --line:#d6dae4; --cell:#ebecf0;
   --head:#45484f; --head-ink:#ffffff; --day:#9b9ea6; --weekend:#a8433f; --accent:#2c5bcc; --teal:#2a7a70;
   --b-blue:#c3cbf7; --b-rose:#f0a3a3; --b-green:#bfe2c8; --b-amber:#f4d898; --b-violet:#dcc7f2; --b-ink:#1b2133;
+  --b-teal:#b5e0dc; --b-peach:#f6c6a8; --b-sky:#b9def5; --b-slate:#d3d6de; --busy:#d4d7df; --ok:#3f8f5a; --ok-bg:#e3f3e8; --bad-bg:#fbe5e3;
   --danger:#b3261e; --shadow:0 1px 2px rgba(20,30,60,.08),0 6px 20px rgba(20,30,60,.06);
   --f-display:"Anuphan","Sarabun",system-ui,sans-serif; --f-body:"Sarabun",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,monospace;
   --daycol:86px; --slot:34px;
@@ -24,11 +25,13 @@
   --bg:#13151b; --surface:#1b1e26; --ink:#e7e9f0; --muted:#a2a8b8; --line:#30343f; --cell:#21242d;
   --head:#0d0f14; --head-ink:#e7e9f0; --day:#3b3f49; --weekend:#86403c; --accent:#93b2ff; --teal:#1f5d55;
   --b-blue:#36427c; --b-rose:#7b3b40; --b-green:#2f5d3e; --b-amber:#6d5626; --b-violet:#54417b; --b-ink:#eef0fa;
+  --b-teal:#255a56; --b-peach:#734a33; --b-sky:#2b5470; --b-slate:#3d424e; --busy:#2c303b; --ok:#5fbf7d; --ok-bg:#1d3326; --bad-bg:#3a1f1f;
   --danger:#ff8a80; --shadow:0 1px 2px rgba(0,0,0,.4); color-scheme:dark }}
 :root[data-theme="dark"]{
   --bg:#13151b; --surface:#1b1e26; --ink:#e7e9f0; --muted:#a2a8b8; --line:#30343f; --cell:#21242d;
   --head:#0d0f14; --head-ink:#e7e9f0; --day:#3b3f49; --weekend:#86403c; --accent:#93b2ff; --teal:#1f5d55;
   --b-blue:#36427c; --b-rose:#7b3b40; --b-green:#2f5d3e; --b-amber:#6d5626; --b-violet:#54417b; --b-ink:#eef0fa;
+  --b-teal:#255a56; --b-peach:#734a33; --b-sky:#2b5470; --b-slate:#3d424e; --busy:#2c303b; --ok:#5fbf7d; --ok-bg:#1d3326; --bad-bg:#3a1f1f;
   --danger:#ff8a80; --shadow:0 1px 2px rgba(0,0,0,.4); color-scheme:dark }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
@@ -121,6 +124,33 @@ textarea.data{width:100%;min-height:110px;border:1px solid var(--line);border-ra
 .dayrow{display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--line);border-radius:8px}
 .dayrow span{flex:1;font-weight:500}
 .ib{border:1px solid var(--line);background:var(--surface);border-radius:6px;width:30px;height:30px;line-height:1}
+.views{display:flex;gap:4px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;width:max-content;max-width:100%;flex-wrap:wrap}
+.views button{border:0;background:transparent;border-radius:7px;padding:7px 16px;font-family:var(--f-display);font-weight:600;color:var(--muted)}
+.views button[aria-selected="true"]{background:var(--accent);color:var(--surface)}
+.gc[data-c="teal"]{background:var(--b-teal)} .gc[data-c="peach"]{background:var(--b-peach)} .gc[data-c="sky"]{background:var(--b-sky)}
+.gc[data-c="slate"]{background:var(--b-slate)}
+.gc.clash{box-shadow:inset 0 0 0 3px var(--danger)}
+.gc .who{font-weight:600}
+.gc.busy{background:repeating-linear-gradient(135deg,var(--cell) 0 6px,var(--busy) 6px 12px);color:var(--muted);cursor:default;border:1px dashed var(--muted)}
+.gc.busy:hover{filter:none}
+.status{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:8px;border:1px solid var(--line)}
+.status.ok{background:var(--ok-bg);border-color:var(--ok)}
+.status.bad{background:var(--bad-bg);border-color:var(--danger)}
+.status b{font-family:var(--f-display)}
+.status ul{margin:0;padding-left:20px;font-size:.88rem}
+.status li{cursor:pointer}
+.pill{display:inline-block;border-radius:999px;padding:1px 8px;font-size:.78rem;font-variant-numeric:tabular-nums;border:1px solid var(--line);white-space:nowrap}
+.pill.done{background:var(--ok-bg);border-color:var(--ok)}
+.pill.over{background:var(--bad-bg);border-color:var(--danger)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.tin{border:1px solid transparent;background:transparent;border-radius:6px;padding:3px 6px;width:100%;min-width:0}
+.tin:hover{border-color:var(--line)} .tin:focus{border-color:var(--accent);background:var(--bg);outline:none}
+.tin.num{width:4.2em;font-variant-numeric:tabular-nums}
+.tin.cd{width:6.5em;font-family:var(--f-mono);font-size:.82rem}
+td.mid{vertical-align:middle}
+tr.grp td{background:var(--cell);font-family:var(--f-display);font-weight:600;text-align:center;color:var(--ink)}
+.mclash{font-size:.85rem;color:var(--danger);background:var(--bad-bg);border-radius:6px;padding:8px 10px}
+.mclash.ok{color:var(--ink);background:var(--ok-bg)}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:.9rem;z-index:60}
 @media (max-width:560px){
   .profile{grid-template-columns:1fr}
@@ -134,14 +164,25 @@ textarea.data{width:100%;min-height:110px;border:1px solid var(--line);border-ra
 <div class="wrap">
   <div class="top">
     <h1>สมุดตารางเรียน</h1>
-    <p>เก็บตารางเรียนของแต่ละคน แตะช่องว่างเพื่อเพิ่มวิชา แตะวิชาเพื่อแก้ไข</p>
+    <p>แตะช่องว่างเพื่อเพิ่ม แตะช่องที่มีข้อมูลเพื่อแก้ไข</p>
   </div>
 
+  <div class="views" role="tablist">
+    <button role="tab" id="tabStudy" data-view="study">ตารางเรียน (มหาลัย)</button>
+    <button role="tab" id="tabTeach" data-view="teach">ตารางสอนเด็ก</button>
+  </div>
+
+  <div id="vStudy" style="display:contents">
   <nav class="people" id="people" aria-label="เลือกเจ้าของตารางเรียน"></nav>
-
   <section class="card sheet" id="sheet"></section>
-
   <section class="card sheet" id="exams"></section>
+  </div>
+
+  <div id="vTeach" style="display:contents">
+  <section class="card sheet" id="tSheet"></section>
+  <section class="card sheet" id="tSubjects"></section>
+  <section class="card sheet" id="tTeachers"></section>
+  </div>
 
   <section class="card tools">
     <h3>สำรอง / ย้ายข้อมูล</h3>
@@ -163,7 +204,7 @@ textarea.data{width:100%;min-height:110px;border:1px solid var(--line);border-ra
 const KEY='class-schedules-v1';
 const ALL_DAYS=['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'];
 const WEEKEND=['เสาร์','อาทิตย์'];
-const COLORS=[['blue','ฟ้า'],['rose','ชมพู'],['green','เขียว'],['amber','เหลือง'],['violet','ม่วง']];
+const COLORS=[['blue','ฟ้า'],['rose','ชมพู'],['green','เขียว'],['amber','เหลือง'],['violet','ม่วง'],['teal','เขียวน้ำทะเล'],['peach','ส้มพีช'],['sky','ฟ้าอ่อน'],['slate','เทา']];
 const uid=()=>Math.random().toString(36).slice(2,10);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const toMin=t=>{const [h,m]=String(t||'0:0').split(':').map(Number);return (h||0)*60+(m||0)};
@@ -234,13 +275,20 @@ function seed(){
 /* ---------- storage ---------- */
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.people)&&s.people.length)return s}catch(e){}return null}
 let state=load()||seed();
+if(!state.teach)state.teach=seedTeach();
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
 const cur=()=>state.people.find(p=>p.id===state.currentId)||state.people[0];
 function commit(){save();render()}
 function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
 
 /* ---------- render ---------- */
-function render(){renderPeople();renderSheet();renderExams()}
+let view='study';
+function setView(v){view=v==='teach'?'teach':'study';try{if(location.hash.slice(1)!==view)history.replaceState(null,'','#'+view)}catch(e){}render()}
+window.addEventListener('hashchange',()=>setView(location.hash.slice(1)));
+function render(){
+  document.getElementById('vStudy').hidden=view!=='study';document.getElementById('vTeach').hidden=view!=='teach';
+  document.getElementById('tabStudy').setAttribute('aria-selected',view==='study');document.getElementById('tabTeach').setAttribute('aria-selected',view==='teach');
+  renderPeople();renderSheet();renderExams();renderTeach()}
 function renderPeople(){
   const el=document.getElementById('people');
   el.innerHTML=state.people.map(p=>`<button class="chip" data-id="${p.id}" aria-pressed="${p.id===cur().id}">${esc(p.name||'(ไม่มีชื่อ)')}</button>`).join('')+
@@ -276,38 +324,43 @@ function renderSheet(){
   const sh=el.querySelector('#f-sh'),eh=el.querySelector('#f-eh');
   sh.onchange=()=>{p.startHour=+sh.value;if(p.endHour<=p.startHour)p.endHour=p.startHour+1;commit()};
   eh.onchange=()=>{p.endHour=+eh.value;if(p.endHour<=p.startHour)p.startHour=p.endHour-1;commit()};
-  el.querySelector('#bDays').onclick=openDays;
+  el.querySelector('#bDays').onclick=()=>openDays(p,p.classes);
   el.querySelector('#bAddClass').onclick=()=>openClass(null,{day:p.days[0]||'จันทร์',start:pad(p.startHour)+':00',end:pad(Math.min(p.startHour+3,p.endHour))+':00'});
   renderGrid(p);
 }
 function courseName(p,code){const e=p.exams.find(x=>x.code.replace(/-\d+$/,'').trim()===code.trim());return e?(e.nameTh||e.nameEn):''}
-function renderGrid(p){
-  const g=document.getElementById('grid'),hours=p.endHour-p.startHour,slots=hours*2,base=p.startHour*60;
+/* shared timetable grid: items = [{day,start,end,html,attrs,cls,tag}] */
+function gridHTML(g,{startHour,endHour,days,items}){
+  const hours=endHour-startHour,slots=hours*2,base=startHour*60;
   g.style.gridTemplateColumns=`var(--daycol) repeat(${slots},minmax(var(--slot),1fr))`;
   let h=`<div class="gh" style="grid-row:1;grid-column:1">Day/Time</div>`;
-  for(let i=0;i<hours;i++)h+=`<div class="gh" style="grid-row:1;grid-column:${2+i*2}/span 2">${pad(p.startHour+i)}:00-${pad(p.startHour+i+1)}:00</div>`;
+  for(let i=0;i<hours;i++)h+=`<div class="gh" style="grid-row:1;grid-column:${2+i*2}/span 2">${pad(startHour+i)}:00-${pad(startHour+i+1)}:00</div>`;
   let row=2;
-  p.days.forEach(day=>{
-    const list=p.classes.filter(c=>c.day===day).sort((a,b)=>toMin(a.start)-toMin(b.start));
+  days.forEach(day=>{
+    const list=items.filter(c=>c.day===day).sort((a,b)=>toMin(a.start)-toMin(b.start));
     const lanes=[];const placed=[];
     list.forEach(c=>{const s=toMin(c.start),e=toMin(c.end);let l=lanes.findIndex(end=>end<=s);if(l<0){l=lanes.length;lanes.push(e)}else lanes[l]=e;placed.push([c,l])});
     const n=Math.max(1,lanes.length);
     h+=`<div class="gd${WEEKEND.includes(day)?' weekend':''}" style="grid-row:${row}/span ${n};grid-column:1">${esc(day)}</div>`;
     for(let l=0;l<n;l++)for(let i=0;i<hours;i++)
-      h+=`<button class="ge" style="grid-row:${row+l};grid-column:${2+i*2}/span 2" data-day="${esc(day)}" data-h="${p.startHour+i}" aria-label="เพิ่มวิชา ${esc(day)} ${pad(p.startHour+i)}:00"></button>`;
+      h+=`<button class="ge" style="grid-row:${row+l};grid-column:${2+i*2}/span 2" data-day="${esc(day)}" data-h="${startHour+i}" aria-label="เพิ่ม ${esc(day)} ${pad(startHour+i)}:00"></button>`;
     placed.forEach(([c,l])=>{
       let s=Math.round((toMin(c.start)-base)/30),e=Math.round((toMin(c.end)-base)/30);
       s=Math.max(0,s);e=Math.min(slots,e);if(e<=s)return;
-      const span=e-s,big=span>=8,nm=courseName(p,c.code);
-      const tm=`(${esc(c.start)}-${esc(c.end)})`;
-      h+=`<button class="gc${big?' big':''}" data-c="${esc(c.color)}" data-cid="${c.id}" style="grid-row:${row+l};grid-column:${2+s}/span ${span}" title="${esc(nm)}">
-        <span><span class="code">${esc(c.code)}</span>${c.group?', '+esc(c.group):''}</span>
-        ${c.room?`<span>${esc(c.room)}</span>`:''}
-        <span>${c.dates?esc(c.dates)+' ':''}${tm}</span></button>`;
+      const span=e-s,tag=c.tag||'button';
+      h+=`<${tag} class="gc${span>=8?' big':''} ${c.cls||''}" ${c.attrs||''} style="grid-row:${row+l};grid-column:${2+s}/span ${span}">${c.html}</${tag}>`;
     });
     row+=n;
   });
   g.innerHTML=h;
+}
+function renderGrid(p){
+  const g=document.getElementById('grid'),base=p.startHour*60;
+  gridHTML(g,{startHour:p.startHour,endHour:p.endHour,days:p.days,items:p.classes.map(c=>({day:c.day,start:c.start,end:c.end,
+    attrs:`data-c="${esc(c.color)}" data-cid="${c.id}" title="${esc(courseName(p,c.code))}"`,
+    html:`<span><span class="code">${esc(c.code)}</span>${c.group?', '+esc(c.group):''}</span>
+        ${c.room?`<span>${esc(c.room)}</span>`:''}
+        <span>${c.dates?esc(c.dates)+' ':''}(${esc(c.start)}-${esc(c.end)})</span>`}))});
   g.querySelectorAll('.ge').forEach(b=>b.onclick=()=>{const hh=+b.dataset.h;openClass(null,{day:b.dataset.day,start:pad(hh)+':00',end:pad(Math.min(hh+2,p.endHour))+':00'})});
   g.querySelectorAll('.gc').forEach(b=>b.onclick=()=>openClass(p.classes.find(c=>c.id===b.dataset.cid)));
   const outside=p.classes.filter(c=>!p.days.includes(c.day)||toMin(c.start)<base||toMin(c.end)>p.endHour*60);
@@ -387,14 +440,13 @@ function openExam(e){
       close();commit();toast('บันทึกแล้ว')};
   });
 }
-function openDays(){
-  const p=cur();
+function openDays(p,items){
   const draw=(ov,close)=>{
     const rest=ALL_DAYS.filter(x=>!p.days.includes(x));
     ov.querySelector('.modal').innerHTML=`<h2>จัดการวัน</h2>
-      <div class="daylist">${p.days.map((d,i)=>{const n=p.classes.filter(c=>c.day===d).length;return `<div class="dayrow"><span>${esc(d)} <span class="note">${n?n+' วิชา':''}</span></span>
+      <div class="daylist">${p.days.map((d,i)=>{const n=items.filter(c=>c.day===d).length;return `<div class="dayrow"><span>${esc(d)} <span class="note">${n?n+' รายการ':''}</span></span>
         <button class="ib" data-up="${i}" aria-label="เลื่อนขึ้น"${i?'':' disabled'}>↑</button><button class="ib" data-dn="${i}" aria-label="เลื่อนลง"${i<p.days.length-1?'':' disabled'}>↓</button><button class="ib" data-rm="${i}" aria-label="เอาวัน ${esc(d)} ออก">✕</button></div>`}).join('')||'<div class="note">ยังไม่มีวัน</div>'}</div>
-      <div class="note">เอาวันออกแล้ววิชาในวันนั้นจะยังเก็บไว้ เพิ่มวันกลับมาก็จะแสดงอีกครั้ง</div>
+      <div class="note">เอาวันออกแล้วข้อมูลในวันนั้นจะยังเก็บไว้ เพิ่มวันกลับมาก็จะแสดงอีกครั้ง</div>
       <div class="form">
         <label>เพิ่มวัน<select id="d-pick">${rest.map(x=>`<option>${x}</option>`).join('')}<option value="__custom">อื่น ๆ (พิมพ์เอง)</option></select></label>
         <label>ชื่อวัน (ถ้าเลือก “อื่น ๆ”)<input id="d-custom" placeholder="เช่น สอบเก็บคะแนน"></label>
@@ -413,19 +465,200 @@ function openDays(){
   modal('',draw);
 }
 
+/* ---------- teaching timetable ---------- */
+function seedTeach(){
+  const T=[['อ. วิวัฒน์','blue'],['พี่เหมย','green'],['โอ','violet'],['แพท','sky'],['ภูมิ','amber'],['ออมสิน','teal'],['เอย','rose'],['ตูน','peach'],['เนย','slate']]
+    .map(([name,color])=>({id:uid(),name,color,personId:''}));
+  const by=n=>T.find(t=>t.name===n).id;
+  const S=(type,code,name,credits,hours,t)=>({id:uid(),type,code,name,credits,hours,teacherId:t?by(t):''});
+  return {title:'ภาคเรียนที่ 2',startHour:8,endHour:16,days:ALL_DAYS.slice(0,5),showBusy:'',teachers:T,slots:[],subjects:[
+    S('พื้นฐาน','ท21102','ภาษาไทย 2',1.5,60,'เอย'),
+    S('พื้นฐาน','ค21102','คณิตศาสตร์ 2',1.5,60,'อ. วิวัฒน์'),
+    S('พื้นฐาน','ว21102','วิทยาศาสตร์ 2',1.5,60,'พี่เหมย'),
+    S('พื้นฐาน','ว21142','วิทยาการคำนวณ 1',0.5,20,'โอ'),
+    S('พื้นฐาน','ส21102','สังคมศึกษา 2',1.5,60,'ภูมิ'),
+    S('พื้นฐาน','ส21104','ประวัติศาสตร์ 2',0.5,20,'ภูมิ'),
+    S('พื้นฐาน','พ21102','สุขศึกษา 2',0.5,20,'ตูน'),
+    S('พื้นฐาน','พ21104','พลศึกษา 2 (ปิงปอง)',0.5,20,'ตูน'),
+    S('พื้นฐาน','ศ21102','ศิลปะ 2',1,40,'เนย'),
+    S('พื้นฐาน','ง21102','การงานอาชีพ 2',0.5,20,'ออมสิน'),
+    S('พื้นฐาน','อ21102','ภาษาอังกฤษ 2',1.5,60,'แพท'),
+    S('เพิ่มเติม','ท21202','พัฒนาการอ่านการเขียน 2',0.5,20,'เอย'),
+    S('เพิ่มเติม','ท21212','เสริมทักษะหลักภาษาไทย 2',0.5,20,'เอย'),
+    S('เพิ่มเติม','ว21202','การพัฒนาและเทคโนโลยีสื่อประสม 2',0.5,20,'โอ'),
+    S('เพิ่มเติม','พ21201','พละ (กีฬา)',0.5,20,'ตูน'),
+    S('เพิ่มเติม','ศ21221','นาฏศิลป์พื้นเมือง 1',0.5,20,'เนย'),
+    S('เพิ่มเติม','ง21221','เกษตร',0.5,20,'ออมสิน'),
+    S('เพิ่มเติม','','ภาษาจีน',0.5,20,'แพท'),
+  ]};
+}
+const TT=()=>state.teach;
+const tch=id=>TT().teachers.find(t=>t.id===id);
+const sub=id=>TT().subjects.find(s=>s.id===id);
+const subLabel=s=>s?((s.code?s.code+' ':'')+s.name):'(ไม่ระบุวิชา)';
+const overlap=(a,b)=>a.day===b.day&&toMin(a.start)<toMin(b.end)&&toMin(b.start)<toMin(a.end);
+const perWeek=s=>Math.max(0,Math.round((+s.hours||0)/20*2)/2);
+function slotClashes(slot){
+  const out=[],t=tch(slot.teacherId);
+  if(t&&t.personId){const p=state.people.find(x=>x.id===t.personId);
+    if(p)p.classes.filter(c=>overlap(c,slot)).forEach(c=>out.push(`${t.name} ติดเรียน ${c.code}${c.group?' กลุ่ม '+c.group:''} ${c.day} ${c.start}-${c.end}${c.dates?' (ช่วง '+c.dates+')':''}`))}
+  TT().slots.filter(s=>s.id!==slot.id&&overlap(s,slot)).forEach(s=>{
+    if(t&&s.teacherId===slot.teacherId)out.push(`${t.name} สอน ${subLabel(sub(s.subjectId))} ${s.start}-${s.end} ซ้อนกัน`);
+    else if((s.room||'').trim()===(slot.room||'').trim())out.push(`${slot.room?'ห้อง '+slot.room:'เด็กกลุ่มเดียวกัน'} มี ${subLabel(sub(s.subjectId))} เวลาเดียวกัน`);
+  });
+  return out;
+}
+function renderTeach(){
+  const T=TT(),el=document.getElementById('tSheet');
+  const all=T.slots.map(s=>({s,c:slotClashes(s)})).filter(x=>x.c.length);
+  const linked=T.teachers.filter(t=>t.personId&&state.people.some(p=>p.id===t.personId));
+  const unlinked=T.teachers.filter(t=>!linked.includes(t)&&T.slots.some(s=>s.teacherId===t.id));
+  el.innerHTML=`
+    <div class="sheet-title">ตารางสอนเด็ก</div>
+    <div class="bar">
+      <div class="grp"><input class="small" id="t-title" value="${esc(T.title)}" aria-label="ชื่อตารางสอน" style="width:12em"></div>
+      <div class="grp"><span class="note">เวลา</span><select class="small" id="t-sh" aria-label="เริ่ม">${hourOpts(T.startHour,6,20)}</select>–<select class="small" id="t-eh" aria-label="สิ้นสุด">${hourOpts(T.endHour,7,22)}</select></div>
+      <div class="grp"><label class="note" for="t-busy">แสดงเวลาที่ติดเรียนของ</label>
+        <select class="small" id="t-busy"><option value="">— ไม่แสดง —</option><option value="*"${T.showBusy==='*'?' selected':''}>ครูทุกคนที่เชื่อมตารางไว้</option>${linked.map(t=>`<option value="${t.id}"${T.showBusy===t.id?' selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
+      <span class="spacer"></span>
+      <button class="btn" id="t-days">จัดการวัน</button>
+      <button class="btn primary" id="t-add">+ เพิ่มคาบสอน</button>
+    </div>
+    ${!T.slots.length?`<div class="status"><b>ยังไม่มีคาบสอน</b><span class="note">แตะช่องว่างในตารางเพื่อเพิ่มคาบสอน เลือกวิชาแล้วระบบจะใส่ครูผู้สอนให้ และเช็คว่าชนกับเวลาเรียนของครูไหม</span></div>`:
+      all.length?`<div class="status bad"><b>พบเวลาชน ${all.length} คาบ</b><ul>${all.map(x=>`<li data-sid="${x.s.id}">${esc(x.s.day)} ${esc(x.s.start)}-${esc(x.s.end)} ${esc(subLabel(sub(x.s.subjectId)))}: ${x.c.map(esc).join(' · ')}</li>`).join('')}</ul></div>`:
+      `<div class="status ok"><b>ไม่มีคาบไหนชนกับเวลาเรียน</b><span class="note">เช็คจาก ${linked.length} ครูที่เชื่อมตารางเรียนไว้</span></div>`}
+    ${unlinked.length?`<div class="warn">ยังเช็คไม่ได้สำหรับ ${unlinked.map(t=>esc(t.name)).join(', ')} เพราะยังไม่ได้เชื่อมกับตารางเรียน (ตั้งค่าในส่วน “ครูผู้สอน” ด้านล่าง)</div>`:''}
+    <div class="scroll"><div class="grid" id="tGrid"></div></div>
+    <div class="note">ช่องที่มีกรอบแดงคือคาบที่ชน ช่องลายทางคือเวลาที่ครูติดเรียน</div>`;
+  el.querySelector('#t-title').oninput=e=>{T.title=e.target.value;save()};
+  const sh=el.querySelector('#t-sh'),eh=el.querySelector('#t-eh');
+  sh.onchange=()=>{T.startHour=+sh.value;if(T.endHour<=T.startHour)T.endHour=T.startHour+1;commit()};
+  eh.onchange=()=>{T.endHour=+eh.value;if(T.endHour<=T.startHour)T.startHour=T.endHour-1;commit()};
+  el.querySelector('#t-busy').onchange=e=>{T.showBusy=e.target.value;commit()};
+  el.querySelector('#t-days').onclick=()=>openDays(T,T.slots);
+  el.querySelector('#t-add').onclick=()=>openSlot(null,{day:T.days[0]||'จันทร์',start:pad(T.startHour)+':00',end:pad(T.startHour+1)+':00'});
+  el.querySelectorAll('li[data-sid]').forEach(li=>li.onclick=()=>openSlot(T.slots.find(s=>s.id===li.dataset.sid)));
+  const clashIds=new Set(all.map(x=>x.s.id));
+  const items=T.slots.map(s=>{const sb=sub(s.subjectId),t=tch(s.teacherId);return {day:s.day,start:s.start,end:s.end,cls:clashIds.has(s.id)?'clash':'',
+    attrs:`data-c="${esc(t?t.color:'slate')}" data-sid="${s.id}"`,
+    html:`<span>${clashIds.has(s.id)?'⚠ ':''}<span class="code">${esc(sb&&sb.code||'')}</span></span><span>${esc(sb?sb.name:'(ไม่ระบุวิชา)')}</span><span class="who">${esc(t?t.name:'')}</span>${s.room?`<span>${esc(s.room)}</span>`:''}`}});
+  const busyT=T.showBusy==='*'?linked:linked.filter(t=>t.id===T.showBusy);
+  busyT.forEach(t=>{const p=state.people.find(x=>x.id===t.personId);p.classes.forEach(c=>items.push({day:c.day,start:c.start,end:c.end,tag:'div',cls:'busy',
+    attrs:`title="${esc(t.name)} ติดเรียน ${esc(c.code)} ${esc(c.dates)}"`,html:`<span class="who">${esc(t.name)} ติดเรียน</span><span>${esc(c.code)}</span><span>${esc(c.start)}-${esc(c.end)}</span>`}))});
+  const g=document.getElementById('tGrid');
+  gridHTML(g,{startHour:T.startHour,endHour:T.endHour,days:T.days,items});
+  g.querySelectorAll('.ge').forEach(b=>b.onclick=()=>{const hh=+b.dataset.h;openSlot(null,{day:b.dataset.day,start:pad(hh)+':00',end:pad(Math.min(hh+1,T.endHour))+':00'})});
+  g.querySelectorAll('[data-sid]').forEach(b=>b.onclick=()=>openSlot(T.slots.find(s=>s.id===b.dataset.sid)));
+  renderSubjects();renderTeachers();
+}
+function teacherOpts(sel){return `<option value="">— ไม่ระบุ —</option>`+TT().teachers.map(t=>`<option value="${t.id}"${t.id===sel?' selected':''}>${esc(t.name)}</option>`).join('')}
+function renderSubjects(){
+  const T=TT(),el=document.getElementById('tSubjects');
+  const placed=s=>T.slots.filter(x=>x.subjectId===s.id).reduce((a,x)=>a+(toMin(x.end)-toMin(x.start))/60,0);
+  const groups=[...new Set(T.subjects.map(s=>s.type||'อื่น ๆ'))];
+  const row=s=>{const need=perWeek(s),got=placed(s);const cls=need&&got===need?'done':got>need?'over':'';
+    return `<tr data-sub="${s.id}"><td><input class="tin cd" data-f="code" value="${esc(s.code)}" aria-label="รหัสวิชา"></td>
+    <td><input class="tin" data-f="name" value="${esc(s.name)}" aria-label="ชื่อวิชา" style="min-width:11em"></td>
+    <td><input class="tin num" data-f="credits" value="${esc(s.credits)}" inputmode="decimal" aria-label="หน่วยกิต"></td>
+    <td><input class="tin num" data-f="hours" value="${esc(s.hours)}" inputmode="numeric" aria-label="ชั่วโมง"></td>
+    <td class="mid"><span class="pill ${cls}">${got}/${need} คาบ</span></td>
+    <td><select class="tin" data-f="teacherId" aria-label="ครูผู้สอน">${teacherOpts(s.teacherId)}</select></td>
+    <td class="mid"><button class="ib" data-delsub="${s.id}" aria-label="ลบวิชา">✕</button></td></tr>`};
+  el.innerHTML=`<div><div class="exam-h">รายวิชา ${esc(T.title)}</div>
+    <div class="scroll"><table><thead><tr><th>รหัสวิชา</th><th>ชื่อวิชา</th><th>น.ก.</th><th>ชม.</th><th>จัดแล้ว/ต่อสัปดาห์</th><th>ครูผู้สอน</th><th></th></tr></thead><tbody>
+    ${groups.map(gname=>{const list=T.subjects.filter(s=>(s.type||'อื่น ๆ')===gname);
+      const cr=list.reduce((a,s)=>a+(+s.credits||0),0),hr=list.reduce((a,s)=>a+(+s.hours||0),0);
+      return `<tr class="grp"><td colspan="7">รายวิชา${esc(gname)}</td></tr>${list.map(row).join('')}<tr><td></td><td class="note">รวมรายวิชา${esc(gname)}</td><td>${cr.toFixed(1)}</td><td>${hr}</td><td colspan="3"></td></tr>`}).join('')}
+    </tbody></table></div></div>
+    <div class="bar"><span class="note">คาบต่อสัปดาห์คิดจาก ชม. ÷ 20 สัปดาห์ (60 ชม. = 3 คาบ, 20 ชม. = 1 คาบ)</span><span class="spacer"></span>
+      <select class="small" id="ns-type" aria-label="ประเภทวิชา"><option>พื้นฐาน</option><option>เพิ่มเติม</option></select>
+      <button class="btn primary" id="ns-add">+ เพิ่มรายวิชา</button></div>`;
+  el.querySelectorAll('tr[data-sub]').forEach(tr=>{const s=sub(tr.dataset.sub);
+    tr.querySelectorAll('[data-f]').forEach(i=>{const f=i.dataset.f;
+      i.oninput=()=>{s[f]=(f==='credits'||f==='hours')?(i.value===''?'':+i.value||0):i.value;save()};
+      i.onchange=()=>commit()})});
+  el.querySelectorAll('[data-delsub]').forEach(b=>{b.onclick=()=>{if(b.classList.contains('armed')){const id=b.dataset.delsub;T.subjects=T.subjects.filter(s=>s.id!==id);T.slots=T.slots.filter(x=>x.subjectId!==id);commit();toast('ลบวิชาแล้ว')}else{b.classList.add('armed');b.textContent='ลบ?';b.style.width='auto';b.style.color='var(--danger)';setTimeout(()=>{b.classList.remove('armed');b.textContent='✕';b.style.width='';b.style.color=''},3000)}}});
+  el.querySelector('#ns-add').onclick=()=>{T.subjects.push({id:uid(),type:el.querySelector('#ns-type').value,code:'',name:'วิชาใหม่',credits:0.5,hours:20,teacherId:''});commit();
+    const ins=document.querySelectorAll('#tSubjects tr[data-sub] [data-f="name"]');const last=[...ins].find(i=>i.value==='วิชาใหม่');last&&(last.focus(),last.select())};
+}
+function renderTeachers(){
+  const T=TT(),el=document.getElementById('tTeachers');
+  el.innerHTML=`<div class="sheet-title">ครูผู้สอน</div>
+    <p class="note" style="margin:0">เชื่อมครูแต่ละคนกับตารางเรียน (มหาลัย) ของคนนั้น เพื่อให้เช็คว่าคาบสอนชนกับเวลาเรียนไหม ครูที่ไม่ได้เรียน เช่น อาจารย์ประจำ ไม่ต้องเชื่อมก็ได้</p>
+    <div class="scroll"><table><thead><tr><th>ชื่อครู</th><th>สอนวิชา</th><th>ตารางเรียนของคนนี้</th><th>คาบ/สัปดาห์</th><th></th></tr></thead><tbody>
+    ${T.teachers.map(t=>{const subs=T.subjects.filter(s=>s.teacherId===t.id);const n=T.slots.filter(s=>s.teacherId===t.id).reduce((a,x)=>a+(toMin(x.end)-toMin(x.start))/60,0);
+      return `<tr data-tid="${t.id}"><td class="mid"><span class="dot" style="background:var(--b-${esc(t.color)})"></span><input class="tin" data-tf="name" value="${esc(t.name)}" aria-label="ชื่อครู" style="width:8em"></td>
+      <td class="mid">${subs.map(s=>esc(s.name)).join(', ')||'<span class="note">—</span>'}</td>
+      <td><select class="tin" data-tf="personId" aria-label="ตารางเรียนของ ${esc(t.name)}"><option value="">— ไม่ได้เชื่อม —</option>${state.people.map(p=>`<option value="${p.id}"${p.id===t.personId?' selected':''}>${esc(p.name)}</option>`).join('')}<option value="__new">+ สร้างตารางเรียนใหม่ชื่อ “${esc(t.name)}”</option></select></td>
+      <td class="mid">${n}</td>
+      <td class="mid"><button class="ib" data-deltch="${t.id}" aria-label="ลบครู">✕</button></td></tr>`}).join('')}
+    </tbody></table></div>
+    <div class="bar"><span class="spacer"></span><button class="btn primary" id="nt-add">+ เพิ่มครู</button></div>`;
+  el.querySelectorAll('tr[data-tid]').forEach(tr=>{const t=tch(tr.dataset.tid);
+    const nm=tr.querySelector('[data-tf=name]');nm.oninput=()=>{t.name=nm.value;save()};nm.onchange=()=>commit();
+    tr.querySelector('[data-tf=personId]').onchange=e=>{let v=e.target.value;
+      if(v==='__new'){const p=person(t.name,{advisor:''});state.people.push(p);v=p.id;toast('สร้างตารางเรียนของ '+t.name+' แล้ว ไปกรอกวิชาที่แท็บตารางเรียน')}
+      t.personId=v;commit()}});
+  el.querySelectorAll('[data-deltch]').forEach(b=>{b.onclick=()=>{if(b.classList.contains('armed')){const id=b.dataset.deltch;T.teachers=T.teachers.filter(t=>t.id!==id);T.subjects.forEach(s=>{if(s.teacherId===id)s.teacherId=''});T.slots.forEach(s=>{if(s.teacherId===id)s.teacherId=''});commit()}else{b.classList.add('armed');b.textContent='ลบ?';b.style.width='auto';b.style.color='var(--danger)';setTimeout(()=>{b.classList.remove('armed');b.textContent='✕';b.style.width='';b.style.color=''},3000)}}});
+  el.querySelector('#nt-add').onclick=()=>{const used=T.teachers.map(t=>t.color);const c=(COLORS.find(([k])=>!used.includes(k))||COLORS[T.teachers.length%COLORS.length])[0];
+    T.teachers.push({id:uid(),name:'ครูใหม่',color:c,personId:''});commit();const ins=[...document.querySelectorAll('#tTeachers [data-tf=name]')].pop();ins&&(ins.focus(),ins.select())};
+}
+function openSlot(s,preset){
+  const T=TT(),isNew=!s,d=s||Object.assign({subjectId:'',teacherId:'',room:''},preset);
+  const days=[...new Set([...T.days,d.day])];
+  const subOpts=[...new Set(T.subjects.map(x=>x.type||'อื่น ๆ'))].map(g=>`<optgroup label="${esc(g)}">${T.subjects.filter(x=>(x.type||'อื่น ๆ')===g).map(x=>`<option value="${x.id}"${x.id===d.subjectId?' selected':''}>${esc(subLabel(x))}</option>`).join('')}</optgroup>`).join('');
+  modal(`<h2>${isNew?'เพิ่มคาบสอน':'แก้ไขคาบสอน'}</h2>
+    <form class="form" id="sf">
+      <label class="full">วิชา<select id="s-sub" required><option value="">— เลือกวิชา —</option>${subOpts}</select></label>
+      <label>ครูผู้สอน<select id="s-tch">${teacherOpts(d.teacherId)}</select></label>
+      <label>ห้อง / ชั้น (ไม่ใส่ก็ได้)<input id="s-room" value="${esc(d.room)}" placeholder="ม.1/1"></label>
+      <label>วัน<select id="s-day">${days.map(x=>`<option${x===d.day?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
+      <span></span>
+      <label>เริ่ม<input type="time" id="s-start" step="1800" value="${esc(d.start)}" required></label>
+      <label>สิ้นสุด<input type="time" id="s-end" step="1800" value="${esc(d.end)}" required></label>
+      <div class="mclash full" id="s-clash"></div>
+      <div class="actions full">${isNew?'':'<button type="button" class="btn danger" id="s-del">ลบ</button><span class="spacer"></span>'}
+        <button type="button" class="btn" id="s-cancel">ยกเลิก</button><button class="btn primary">บันทึก</button></div>
+    </form>`,(ov,close)=>{
+    const q=id=>ov.querySelector('#s-'+id);
+    const read=()=>({id:s?s.id:'__draft',subjectId:q('sub').value,teacherId:q('tch').value,room:q('room').value.trim(),day:q('day').value,start:q('start').value,end:q('end').value});
+    const check=()=>{const o=read(),box=q('clash');
+      if(toMin(o.end)<=toMin(o.start)){box.className='mclash full';box.textContent='เวลาสิ้นสุดต้องหลังเวลาเริ่ม';return false}
+      const c=slotClashes(o),t=tch(o.teacherId);
+      if(c.length){box.className='mclash full';box.innerHTML='<b>⚠ ชน:</b> '+c.map(esc).join('<br>')}
+      else{box.className='mclash full ok';box.textContent=!t?'ยังไม่ได้เลือกครู':t.personId?`ไม่ชน ${t.name} ว่างช่วงนี้`:`ไม่ชนกับคาบสอนอื่น (${t.name} ยังไม่ได้เชื่อมตารางเรียน จึงเช็คเวลาเรียนไม่ได้)`}
+      return true};
+    q('sub').onchange=()=>{const x=sub(q('sub').value);if(x&&x.teacherId)q('tch').value=x.teacherId;check()};
+    ['tch','room','day','start','end'].forEach(k=>q(k).oninput=check);q('day').onchange=check;q('tch').onchange=check;
+    check();
+    q('cancel').onclick=close;
+    const del=q('del');del&&armDelete(del,()=>{T.slots=T.slots.filter(x=>x.id!==s.id);close();commit();toast('ลบคาบสอนแล้ว')});
+    ov.querySelector('#sf').onsubmit=e=>{e.preventDefault();if(!check())return;
+      const o=read();delete o.id;
+      if(isNew)T.slots.push({id:uid(),...o});else Object.assign(s,o);
+      if(toMin(o.start)<T.startHour*60)T.startHour=Math.floor(toMin(o.start)/60);
+      if(toMin(o.end)>T.endHour*60)T.endHour=Math.ceil(toMin(o.end)/60);
+      const c=slotClashes(isNew?T.slots[T.slots.length-1]:s);
+      close();commit();toast(c.length?'บันทึกแล้ว แต่มีเวลาชน':'บันทึกแล้ว ไม่ชน')};
+  });
+}
+
 /* ---------- data tools ---------- */
 const box=document.getElementById('dataBox');
 async function copyOut(obj,label){box.value=JSON.stringify(obj);try{await navigator.clipboard.writeText(box.value);toast('คัดลอก'+label+'แล้ว')}catch(e){box.focus();box.select();toast('เลือกข้อความไว้แล้ว กดคัดลอกเองได้เลย')}}
 document.getElementById('bExpOne').onclick=()=>copyOut(cur(),'ข้อมูลคนนี้');
-document.getElementById('bExpAll').onclick=()=>copyOut(state.people,'ข้อมูลทุกคน');
+document.getElementById('bExpAll').onclick=()=>copyOut({people:state.people,teach:state.teach},'ข้อมูลทุกคนและตารางสอน');
 document.getElementById('bImport').onclick=()=>{
   let d;try{d=JSON.parse(box.value)}catch(e){toast('ข้อความไม่ใช่ข้อมูลตารางเรียน ลองคัดลอกใหม่อีกครั้ง');return}
   const arr=Array.isArray(d)?d:d&&Array.isArray(d.people)?d.people:[d];
   const ok=arr.filter(x=>x&&typeof x==='object'&&Array.isArray(x.classes));
-  if(!ok.length){toast('ไม่พบตารางเรียนในข้อความที่วาง');return}
-  ok.forEach(x=>{const p=person(x.name||'นำเข้า',x);p.id=uid();p.days=Array.isArray(x.days)?x.days:p.days;p.exams=Array.isArray(x.exams)?x.exams:[];
+  const hasTeach=d&&d.teach&&Array.isArray(d.teach.slots);
+  if(!ok.length&&!hasTeach){toast('ไม่พบตารางเรียนในข้อความที่วาง');return}
+  const idMap={};
+  ok.forEach(x=>{const p=person(x.name||'นำเข้า',x);p.id=uid();idMap[x.id]=p.id;p.days=Array.isArray(x.days)?x.days:p.days;p.exams=Array.isArray(x.exams)?x.exams:[];
     p.classes.forEach(c=>c.id=c.id||uid());p.exams.forEach(e=>e.id=e.id||uid());state.people.push(p);state.currentId=p.id});
-  box.value='';commit();toast('นำเข้า '+ok.length+' ตารางแล้ว');
+  if(hasTeach){state.teach=d.teach;state.teach.teachers.forEach(t=>{if(t.personId)t.personId=idMap[t.personId]||(state.people.some(p=>p.id===t.personId)?t.personId:'')})}
+  box.value='';commit();toast('นำเข้า '+ok.length+' ตาราง'+(hasTeach?' และตารางสอน':'')+'แล้ว');
 };
 document.getElementById('bDup').onclick=()=>{const p=JSON.parse(JSON.stringify(cur()));p.id=uid();p.name+=' (สำเนา)';state.people.push(p);state.currentId=p.id;commit();toast('ทำสำเนาแล้ว')};
 const bDel=document.getElementById('bDel');
@@ -436,6 +669,8 @@ bDel.onclick=()=>{
   state.currentId=state.people[0].id;bDel.classList.remove('armed');bDel.textContent='ลบตารางของคนนี้';commit();toast('ลบตารางของ '+name+' แล้ว');
 };
 
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
+view=location.hash.slice(1)==='teach'?'teach':'study';
 render();
 </script>
 
