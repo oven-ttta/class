@@ -156,6 +156,93 @@ tr.grp td{background:var(--cell);font-family:var(--f-display);font-weight:600;te
 .sync[data-s="live"]{color:var(--ok);border-color:var(--ok)} .sync[data-s="live"]::before{background:var(--ok)}
 .sync[data-s="error"]{color:var(--danger);border-color:var(--danger)} .sync[data-s="error"]::before{background:var(--danger)}
 .sync[data-s="connecting"]::before{background:var(--b-amber)}
+
+/* ---- app shell ---- */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:21;background:var(--bg)}
+.appbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.appbar-in{max-width:1280px;margin:0 auto;padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}
+.appbar h1{font-size:1.3rem;font-weight:700;margin-right:auto}
+.wrap{max-width:1280px}
+.study{display:grid;grid-template-columns:270px minmax(0,1fr);gap:18px;align-items:start}
+.main{display:flex;flex-direction:column;gap:18px;min-width:0}
+.teach{display:flex;flex-direction:column;gap:18px;min-width:0}
+.side{position:sticky;top:76px;padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.side-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.side-h h2{font-size:1rem}
+.side input.q[type="search"],.side select.q{flex:none;width:100%}
+td.wide>span{display:block}
+.plist{display:flex;flex-direction:column;gap:4px;max-height:58vh;overflow:auto;margin:0 -4px;padding:0 4px}
+.pitem{display:flex;flex-direction:column;align-items:flex-start;text-align:left;border:1px solid transparent;background:transparent;border-radius:8px;padding:8px 10px;gap:1px}
+.pitem:hover{background:var(--cell)}
+.pitem[aria-pressed="true"]{background:color-mix(in srgb,var(--accent) 14%,var(--surface));border-color:color-mix(in srgb,var(--accent) 45%,var(--line))}
+.pitem .pn{font-weight:600;line-height:1.3}
+.pitem .ps{font-size:.76rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.sheet-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sheet-head>div{flex:1 1 260px;min-width:0}
+.eyebrow{font-size:.78rem;color:var(--accent);font-family:var(--f-display);font-weight:600;letter-spacing:.02em}
+.stats{font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums;padding-left:8px}
+details.prof{border:1px solid var(--line);border-radius:8px;padding:0 12px}
+details.prof[open]{padding-bottom:12px}
+details summary{cursor:pointer;padding:9px 0;font-weight:600;font-family:var(--f-display);font-size:.92rem;color:var(--muted)}
+details.prof .profile{margin-bottom:10px}
+/* ---- filters ---- */
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+input.q,select.q{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:6px 10px;min-height:36px;max-width:100%}
+input.q[type="search"]{flex:1 1 200px;min-width:0}
+.qlabel{display:inline-flex;align-items:center;gap:6px;font-size:.85rem;color:var(--muted);flex-wrap:wrap}
+.qcheck{display:inline-flex;align-items:center;gap:6px;font-size:.88rem}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none}
+.seg button{border:0;background:var(--surface);padding:6px 12px;min-height:34px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.count{font-size:.82rem;color:var(--muted)}
+.gc.dim{opacity:.18}
+.next{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:10px 12px;border-radius:8px;background:color-mix(in srgb,var(--teal) 12%,var(--surface));border:1px solid color-mix(in srgb,var(--teal) 40%,var(--line));font-size:.9rem}
+.next b{font-family:var(--f-display)}
+/* ---- agenda (list mode) ---- */
+.agenda{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.aday{border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;background:var(--surface);min-width:0}
+.aday-h{font-size:.95rem;background:var(--day);color:var(--head-ink);padding:7px 12px;display:flex;justify-content:space-between;align-items:center}
+.aday-h.weekend{background:var(--weekend)}
+.aday-h span{font-size:.78rem;font-family:var(--f-body);font-weight:500;opacity:.9}
+.ai{display:grid;grid-template-columns:3.2em minmax(0,1fr);gap:10px;text-align:left;border:0;border-left:5px solid var(--sw);background:color-mix(in srgb,var(--sw) 38%,var(--surface));margin:8px 8px 0;border-radius:6px;padding:8px 10px;color:var(--ink);font-size:.86rem;line-height:1.35}
+.ai:hover{filter:brightness(.97)}
+.ai .at{font-variant-numeric:tabular-nums;font-weight:600;font-size:.8rem;color:var(--muted)}
+.ai .ab{display:flex;flex-direction:column;min-width:0;overflow-wrap:anywhere}
+.ai .code{font-family:var(--f-mono);color:var(--accent);font-size:.8rem}
+.ai.clash{box-shadow:inset 0 0 0 2px var(--danger)}
+.ai.busy{background:repeating-linear-gradient(135deg,var(--cell) 0 6px,var(--busy) 6px 12px);border-left-color:var(--muted);color:var(--muted);cursor:default}
+.aempty{padding:10px 12px 0}
+.addday{margin:8px;border:1px dashed var(--line);background:transparent;border-radius:6px;padding:7px;color:var(--muted);font-size:.85rem}
+.addday:hover{border-color:var(--accent);color:var(--accent)}
+details.tools summary{padding:0}
+/* ---- tables become cards on phones ---- */
+@media (max-width:900px){
+  .study{grid-template-columns:1fr}
+  .side{position:static}
+  .plist{flex-direction:row;overflow-x:auto;max-height:none;padding-bottom:4px}
+  .pitem{flex:none;min-width:150px;max-width:220px;border-color:var(--line)}
+}
+@media (max-width:640px){
+  .sheet{padding:14px}
+  .appbar h1{font-size:1.1rem}
+  .views{order:3;width:100%;max-width:none}
+  .views button{flex:1;padding:7px 8px}
+  table.cards{min-width:0}
+  table.cards thead{display:none}
+  table.cards tr{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;padding:10px 2px;border-bottom:1px solid var(--line)}
+  table.cards tr.grp,table.cards tr.sum{display:block;padding:0}
+  table.cards tr.grp td,table.cards tr.sum td{display:block;width:100%}
+  table.cards td{border:0;padding:2px 4px;display:flex;flex-direction:column;gap:1px;min-width:0}
+  table.cards td[data-label]::before{content:attr(data-label);font-size:.72rem;color:var(--muted);font-family:var(--f-body)}
+  table.cards td.wide{grid-column:1/-1}
+  table.cards td.when{text-align:left}
+  table.cards td.act{position:absolute;right:4px;top:8px}
+  table.cards tr{position:relative}
+  .tin.num,.tin.cd{width:100%}
+  #tSubjects table.cards tr{grid-template-columns:repeat(3,minmax(0,1fr));padding-right:40px}
+  table.cards td.span2,#tSubjects table.cards td.wide{grid-column:span 2}
+}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:.9rem;z-index:60}
 @media (max-width:560px){
   .profile{grid-template-columns:1fr}
@@ -166,31 +253,32 @@ tr.grp td{background:var(--cell);font-family:var(--f-display);font-weight:600;te
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
-<div class="wrap">
-  <div class="top">
-    <h1>สมุดตารางเรียน</h1>
-    <p>แตะช่องว่างเพื่อเพิ่ม แตะช่องที่มีข้อมูลเพื่อแก้ไข <span class="sync" id="sync" data-s="local">บันทึกในเครื่องนี้</span></p>
-  </div>
-
+<header class="appbar"><div class="appbar-in">
+  <h1>สมุดตารางเรียน</h1>
   <div class="views" role="tablist">
     <button role="tab" id="tabStudy" data-view="study">ตารางเรียน (มหาลัย)</button>
     <button role="tab" id="tabTeach" data-view="teach">ตารางสอนเด็ก</button>
   </div>
+  <span class="sync" id="sync" data-s="local">บันทึกในเครื่องนี้</span>
+</div></header>
 
-  <div id="vStudy" style="display:contents">
-  <nav class="people" id="people" aria-label="เลือกเจ้าของตารางเรียน"></nav>
-  <section class="card sheet" id="sheet"></section>
-  <section class="card sheet" id="exams"></section>
+<div class="wrap">
+  <div id="vStudy" class="study">
+    <aside class="card side" id="people" aria-label="เลือกเจ้าของตารางเรียน"></aside>
+    <div class="main">
+      <section class="card sheet" id="sheet"></section>
+      <section class="card sheet" id="exams"></section>
+    </div>
   </div>
 
-  <div id="vTeach" style="display:contents">
-  <section class="card sheet" id="tSheet"></section>
-  <section class="card sheet" id="tSubjects"></section>
-  <section class="card sheet" id="tTeachers"></section>
+  <div id="vTeach" class="teach">
+    <section class="card sheet" id="tSheet"></section>
+    <section class="card sheet" id="tSubjects"></section>
+    <section class="card sheet" id="tTeachers"></section>
   </div>
 
-  <section class="card tools">
-    <h3>สำรอง / ย้ายข้อมูล</h3>
+  <details class="card tools">
+    <summary><h3 style="display:inline">สำรอง / ย้ายข้อมูล</h3></summary>
     <p class="note" style="margin:0">ข้อมูลบันทึกอัตโนมัติ ถ้าเปิดผ่านเว็บที่ต่อฐานข้อมูลแล้ว (ป้ายด้านบนเป็นสีเขียว) ทุกคนจะเห็นข้อมูลชุดเดียวกันทันที ถ้าป้ายเป็นสีเทา ข้อมูลอยู่ในเครื่องนี้เท่านั้น ใช้ปุ่มด้านล่างคัดลอกไปวางที่อื่นได้</p>
     <div class="bar">
       <button class="btn" id="bExpOne">คัดลอกข้อมูลคนนี้</button>
@@ -201,7 +289,7 @@ tr.grp td{background:var(--cell);font-family:var(--f-display);font-weight:600;te
       <button class="btn danger" id="bDel">ลบตารางของคนนี้</button>
     </div>
     <textarea class="data" id="dataBox" placeholder="ข้อมูลที่คัดลอกจะแสดงที่นี่ หรือวางข้อมูลที่ต้องการนำเข้าแล้วกด “นำเข้าจากข้อความที่วาง”"></textarea>
-  </section>
+  </details>
 </div>
 <div id="modalRoot"></div>
 
@@ -293,39 +381,98 @@ window.addEventListener('hashchange',()=>setView(location.hash.slice(1)));
 function render(){
   document.getElementById('vStudy').hidden=view!=='study';document.getElementById('vTeach').hidden=view!=='teach';
   document.getElementById('tabStudy').setAttribute('aria-selected',view==='study');document.getElementById('tabTeach').setAttribute('aria-selected',view==='teach');
-  renderPeople();renderSheet();renderExams();renderTeach()}
+  const a=document.activeElement,aid=a&&a.id,sel=a&&a.type==='search'?[a.selectionStart,a.selectionEnd]:null;
+  renderPeople();renderSheet();renderExams();renderTeach();
+  if(aid){const n=document.getElementById(aid);if(n&&n!==a){n.focus({preventScroll:true});if(sel)try{n.setSelectionRange(sel[0],sel[1])}catch(e){}}}}
+/* ---------- per-viewer view settings (search, sort, filter, layout) ---------- */
+const UIKEY=KEY+'-ui';
+let ui={};try{ui=JSON.parse(localStorage.getItem(UIKEY))||{}}catch(e){}
+ui=Object.assign({pq:'',psort:'order',cq:'',cdate:'',eq:'',esort:'code',tq:'',tteacher:'',sq:'',stype:'',spending:false,ssort:'order',teq:'',tesort:'order'},ui);
+if(!ui.smode)ui.smode=innerWidth<700?'list':'grid';
+if(!ui.tmode)ui.tmode=ui.smode;
+function saveUI(){try{localStorage.setItem(UIKEY,JSON.stringify(ui))}catch(e){}}
+function setUI(k,v){ui[k]=v;saveUI();render()}
+function bindUI(root){
+  root.querySelectorAll('[data-ui]').forEach(i=>{const k=i.dataset.ui,ev=i.type==='search'?'input':'change';
+    i.addEventListener(ev,()=>setUI(k,i.type==='checkbox'?i.checked:i.value))});
+  root.querySelectorAll('[data-seg]').forEach(b=>b.onclick=()=>setUI(b.dataset.seg,b.dataset.val));
+}
+const seg=(k,opts)=>`<div class="seg" role="group" aria-label="รูปแบบการแสดง">${opts.map(([v,l])=>`<button class="q" id="seg-${k}-${v}" data-seg="${k}" data-val="${v}" aria-pressed="${ui[k]===v}">${l}</button>`).join('')}</div>`;
+const opt=(k,v,l)=>`<option value="${v}"${String(ui[k])===String(v)?' selected':''}>${l}</option>`;
+const hasQ=(q,...f)=>{q=String(q||'').trim().toLowerCase();return !q||f.join(' ').toLowerCase().includes(q)};
+const hrs=list=>list.reduce((a,c)=>a+Math.max(0,toMin(c.end)-toMin(c.start))/60,0);
+const fmtH=h=>String(Math.round(h*10)/10);
+const byStr=(a,b)=>String(a||'').localeCompare(String(b||''),'th');
+function parseBE(s){const m=String(s||'').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);if(!m)return null;let y=+m[3];if(y>2400)y-=543;return new Date(y,+m[2]-1,+m[1])}
+function inWeek(dates,iso){
+  if(!iso||!dates)return true;const parts=String(dates).split('-');const a=parseBE(parts[0]),b=parseBE(parts[1]);
+  const d=new Date(iso+'T00:00');if(isNaN(d))return true;
+  const ws=new Date(d);ws.setDate(d.getDate()-((d.getDay()+6)%7));const we=new Date(ws);we.setDate(ws.getDate()+6);
+  return (!a||a<=we)&&(!b||b>=ws);
+}
+const TH_M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+function examTime(s){const m=String(s||'').match(/(\d{1,2})\s*([ก-๙]+\.[ก-๙]+\.)\s*(\d{4})/);if(!m)return Infinity;const mi=TH_M.indexOf(m[2]);if(mi<0)return Infinity;
+  let y=+m[3];if(y>2400)y-=543;const t=String(s).match(/(\d{1,2}):(\d{2})/);return new Date(y,mi,+m[1],t?+t[1]:0,t?+t[2]:0).getTime()}
+const isoToday=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+
 function renderPeople(){
   const el=document.getElementById('people');
-  el.innerHTML=state.people.map(p=>`<button class="chip" data-id="${p.id}" aria-pressed="${p.id===cur().id}">${esc(p.name||'(ไม่มีชื่อ)')}</button>`).join('')+
-    `<button class="chip add" id="addPerson">+ เพิ่มคน</button>`;
+  let list=state.people.map((p,i)=>({p,i,n:p.classes.length,h:hrs(p.classes)}));
+  const total=list.length;
+  list=list.filter(x=>hasQ(ui.pq,x.p.name,x.p.program,...x.p.classes.map(c=>c.code)));
+  const cmp={order:(a,b)=>a.i-b.i,az:(a,b)=>byStr(a.p.name,b.p.name),za:(a,b)=>byStr(b.p.name,a.p.name),hours:(a,b)=>b.h-a.h||a.i-b.i}[ui.psort]||((a,b)=>a.i-b.i);
+  list.sort(cmp);
+  el.innerHTML=`<div class="side-h"><h2>ตารางของใคร</h2><span class="count">${list.length===total?total+' คน':list.length+' จาก '+total+' คน'}</span></div>
+    <input type="search" class="q" id="q-people" data-ui="pq" value="${esc(ui.pq)}" placeholder="ค้นหาชื่อ หรือรหัสวิชา" aria-label="ค้นหาคน">
+    <select class="q" id="so-people" data-ui="psort" aria-label="เรียงลำดับ">${opt('psort','order','เรียงตามลำดับที่เพิ่ม')}${opt('psort','az','ชื่อ ก → ฮ')}${opt('psort','za','ชื่อ ฮ → ก')}${opt('psort','hours','ชั่วโมงเรียนมาก → น้อย')}</select>
+    <div class="plist">${list.map(x=>`<button class="pitem" data-id="${x.p.id}" aria-pressed="${x.p.id===cur().id}"><span class="pn">${esc(x.p.name||'(ไม่มีชื่อ)')}</span><span class="ps">${x.n} วิชา · ${fmtH(x.h)} ชม./สัปดาห์</span></button>`).join('')}</div>
+    ${list.length?'':'<div class="note">ไม่พบชื่อหรือรหัสวิชาที่ค้นหา</div>'}
+    <button class="btn" id="addPerson">+ เพิ่มคน</button>`;
+  bindUI(el);
   el.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{state.currentId=b.dataset.id;commit()});
-  document.getElementById('addPerson').onclick=()=>{const p=person('คนใหม่',{advisor:''});state.people.push(p);state.currentId=p.id;commit();
+  el.querySelector('#addPerson').onclick=()=>{const p=person('คนใหม่',{advisor:''});state.people.push(p);state.currentId=p.id;ui.pq='';saveUI();commit();
     setTimeout(()=>{const f=document.getElementById('f-name');f&&(f.focus(),f.select())},0)};
 }
 function hourOpts(sel,from,to){let s='';for(let h=from;h<=to;h++)s+=`<option value="${h}"${h===sel?' selected':''}>${pad(h)}:00</option>`;return s}
+const classMatch=(p,c)=>hasQ(ui.cq,c.code,c.room,c.group,c.day,courseName(p,c.code))&&inWeek(c.dates,ui.cdate);
 function renderSheet(){
   const p=cur(),el=document.getElementById('sheet');
   const F=(k,label,cls='')=>`<label for="f-${k}">${label}</label><input class="field ${cls}" id="f-${k}" data-k="${k}" value="${esc(p[k])}" placeholder="—">`;
+  const open=ui.profOpen??(innerWidth>=700);
+  const shown=p.classes.filter(c=>classMatch(p,c)).length,filtering=!!(String(ui.cq).trim()||ui.cdate);
   el.innerHTML=`
-    <div class="sheet-title">ตารางเรียน/สอบของรายวิชาที่ลงทะเบียนไว้แล้ว</div>
-    <div class="profile">
-      ${F('name','ชื่อ','name')}${F('status','สถานภาพ')}${F('faculty','สำนักวิชา')}${F('program','หลักสูตร')}${F('advisor','อ. ที่ปรึกษา')}
+    <div class="sheet-head"><div>
+        <div class="eyebrow">ตารางเรียน/สอบของรายวิชาที่ลงทะเบียนไว้แล้ว</div>
+        <input class="field name" id="f-name" data-k="name" value="${esc(p.name)}" placeholder="ชื่อเจ้าของตาราง" aria-label="ชื่อเจ้าของตาราง">
+        <div class="stats">${p.classes.length} วิชา · ${fmtH(hrs(p.classes))} ชม./สัปดาห์ · ปีการศึกษา ${esc(p.year)}/${esc(p.term)}</div>
+      </div>
+      <button class="btn primary" id="bAddClass">+ เพิ่มวิชา</button></div>
+    <details class="prof" id="prof"${open?' open':''}><summary>ข้อมูลนักศึกษา</summary>
+      <div class="profile">${F('status','สถานภาพ')}${F('faculty','สำนักวิชา')}${F('program','หลักสูตร')}${F('advisor','อ. ที่ปรึกษา')}
+        <label for="f-year">ปีการศึกษา</label>
+        <div class="grp" style="display:flex;gap:6px;align-items:center"><input class="small year" id="f-year" data-k="year" value="${esc(p.year)}" aria-label="ปีการศึกษา"> / <input class="small term" id="f-term" data-k="term" value="${esc(p.term)}" aria-label="ภาคการศึกษา"></div>
+      </div></details>
+    <div class="filters">
+      <input type="search" class="q" id="q-class" data-ui="cq" value="${esc(ui.cq)}" placeholder="ค้นหารหัสวิชา ห้อง หรือชื่อวิชา" aria-label="ค้นหาวิชา">
+      <label class="qlabel">เรียนในสัปดาห์ของ <input type="date" class="q" id="d-class" data-ui="cdate" value="${esc(ui.cdate)}"></label>
+      <button class="btn q" id="d-week">${ui.cdate?'ล้างตัวกรอง':'สัปดาห์นี้'}</button>
+      ${seg('smode',[['grid','ตาราง'],['list','รายการ']])}
     </div>
+    ${filtering?`<div class="count">แสดง ${shown} จาก ${p.classes.length} วิชา${ui.cdate?' · วิชาที่ไม่มีช่วงวันที่จะแสดงทุกสัปดาห์':''}</div>`:''}
+    <div id="gridWrap"></div>
+    <div id="hidden"></div>
     <div class="bar">
-      <div class="grp"><span class="lbl">ปีการศึกษา :</span>
-        <input class="small year" id="f-year" data-k="year" value="${esc(p.year)}" aria-label="ปีการศึกษา"> /
-        <input class="small term" id="f-term" data-k="term" value="${esc(p.term)}" aria-label="ภาคการศึกษา"></div>
-      <div class="grp"><span class="note">เวลา</span>
+      <div class="grp"><span class="note">ช่วงเวลาที่แสดง</span>
         <select class="small" id="f-sh" aria-label="เริ่ม">${hourOpts(p.startHour,6,20)}</select>–
         <select class="small" id="f-eh" aria-label="สิ้นสุด">${hourOpts(p.endHour,7,22)}</select></div>
-      <span class="spacer"></span>
       <button class="btn" id="bDays">จัดการวัน</button>
-      <button class="btn primary" id="bAddClass">+ เพิ่มวิชาในตาราง</button>
-    </div>
-    <div class="scroll"><div class="grid" id="grid"></div></div>
-    <div id="hidden"></div>
-    <div class="note">* ข้อมูลในตารางเรียนประกอบด้วย รหัสวิชา, กลุ่ม, ห้องเรียนและอาคาร, ช่วงวันที่ (เวลา) ตามลำดับ</div>`;
+      <span class="spacer"></span>
+      <span class="note">* รหัสวิชา, กลุ่ม, ห้องเรียนและอาคาร, ช่วงวันที่ (เวลา)</span>
+    </div>`;
+  bindUI(el);
   el.querySelectorAll('[data-k]').forEach(i=>i.oninput=()=>{p[i.dataset.k]=i.value;save();if(i.dataset.k==='name')renderPeople()});
+  el.querySelector('#prof').addEventListener('toggle',e=>{ui.profOpen=e.target.open;saveUI()});
+  el.querySelector('#d-week').onclick=()=>setUI('cdate',ui.cdate?'':isoToday());
   const sh=el.querySelector('#f-sh'),eh=el.querySelector('#f-eh');
   sh.onchange=()=>{p.startHour=+sh.value;if(p.endHour<=p.startHour)p.endHour=p.startHour+1;commit()};
   eh.onchange=()=>{p.endHour=+eh.value;if(p.endHour<=p.startHour)p.startHour=p.endHour-1;commit()};
@@ -333,8 +480,8 @@ function renderSheet(){
   el.querySelector('#bAddClass').onclick=()=>openClass(null,{day:p.days[0]||'จันทร์',start:pad(p.startHour)+':00',end:pad(Math.min(p.startHour+3,p.endHour))+':00'});
   renderGrid(p);
 }
-function courseName(p,code){const e=p.exams.find(x=>x.code.replace(/-\d+$/,'').trim()===code.trim());return e?(e.nameTh||e.nameEn):''}
-/* shared timetable grid: items = [{day,start,end,html,attrs,cls,tag}] */
+function courseName(p,code){const e=p.exams.find(x=>x.code.replace(/-\d+$/,'').trim()===String(code).trim());return e?(e.nameTh||e.nameEn):''}
+/* shared timetable: items = [{day,start,end,html,attrs,cls,tag,color,hide}] */
 function gridHTML(g,{startHour,endHour,days,items}){
   const hours=endHour-startHour,slots=hours*2,base=startHour*60;
   g.style.gridTemplateColumns=`var(--daycol) repeat(${slots},minmax(var(--slot),1fr))`;
@@ -353,31 +500,58 @@ function gridHTML(g,{startHour,endHour,days,items}){
       let s=Math.round((toMin(c.start)-base)/30),e=Math.round((toMin(c.end)-base)/30);
       s=Math.max(0,s);e=Math.min(slots,e);if(e<=s)return;
       const span=e-s,tag=c.tag||'button';
-      h+=`<${tag} class="gc${span>=8?' big':''} ${c.cls||''}" ${c.attrs||''} style="grid-row:${row+l};grid-column:${2+s}/span ${span}">${c.html}</${tag}>`;
+      h+=`<${tag} class="gc${span>=8?' big':''} ${c.cls||''}${c.hide?' dim':''}" ${c.attrs||''} style="grid-row:${row+l};grid-column:${2+s}/span ${span}">${c.html}</${tag}>`;
     });
     row+=n;
   });
   g.innerHTML=h;
 }
+function agendaHTML(g,{days,items,addLabel}){
+  g.innerHTML=days.map(day=>{
+    const list=items.filter(i=>i.day===day&&!i.hide).sort((a,b)=>toMin(a.start)-toMin(b.start));
+    const n=list.filter(i=>!String(i.cls||'').includes('busy')).length;
+    return `<section class="aday"><h3 class="aday-h${WEEKEND.includes(day)?' weekend':''}">${esc(day)}<span>${n?n+' รายการ':''}</span></h3>
+      ${list.map(i=>{const tag=i.tag||'button';return `<${tag} class="ai ${i.cls||''}" ${i.attrs||''} style="--sw:var(--b-${esc(i.color||'slate')})"><span class="at">${esc(i.start)}<br>${esc(i.end)}</span><span class="ab">${i.html}</span></${tag}>`}).join('')||'<div class="note aempty">ว่าง</div>'}
+      <button class="addday" data-day="${esc(day)}">+ ${addLabel}</button></section>`}).join('');
+}
+function drawTimetable(wrap,mode,cfg){
+  if(mode==='list'){wrap.innerHTML='<div class="agenda"></div>';agendaHTML(wrap.firstChild,cfg)}
+  else{wrap.innerHTML='<div class="scroll"><div class="grid"></div></div>';gridHTML(wrap.querySelector('.grid'),cfg)}
+}
 function renderGrid(p){
-  const g=document.getElementById('grid'),base=p.startHour*60;
-  gridHTML(g,{startHour:p.startHour,endHour:p.endHour,days:p.days,items:p.classes.map(c=>({day:c.day,start:c.start,end:c.end,
+  const wrap=document.getElementById('gridWrap'),base=p.startHour*60;
+  drawTimetable(wrap,ui.smode,{startHour:p.startHour,endHour:p.endHour,days:p.days,addLabel:'เพิ่มวิชา',items:p.classes.map(c=>({day:c.day,start:c.start,end:c.end,color:c.color,hide:!classMatch(p,c),
     attrs:`data-c="${esc(c.color)}" data-cid="${c.id}" title="${esc(courseName(p,c.code))}"`,
-    html:`<span><span class="code">${esc(c.code)}</span>${c.group?', '+esc(c.group):''}</span>
+    html:ui.smode==='list'
+      ?`<span><span class="code">${esc(c.code)}</span>${c.group?' กลุ่ม '+esc(c.group):''}</span>${courseName(p,c.code)?`<span>${esc(courseName(p,c.code))}</span>`:''}${c.room?`<span>${esc(c.room)}</span>`:''}${c.dates?`<span class="note">${esc(c.dates)}</span>`:''}`
+      :`<span><span class="code">${esc(c.code)}</span>${c.group?', '+esc(c.group):''}</span>
         ${c.room?`<span>${esc(c.room)}</span>`:''}
         <span>${c.dates?esc(c.dates)+' ':''}(${esc(c.start)}-${esc(c.end)})</span>`}))});
-  g.querySelectorAll('.ge').forEach(b=>b.onclick=()=>{const hh=+b.dataset.h;openClass(null,{day:b.dataset.day,start:pad(hh)+':00',end:pad(Math.min(hh+2,p.endHour))+':00'})});
-  g.querySelectorAll('.gc').forEach(b=>b.onclick=()=>openClass(p.classes.find(c=>c.id===b.dataset.cid)));
-  const outside=p.classes.filter(c=>!p.days.includes(c.day)||toMin(c.start)<base||toMin(c.end)>p.endHour*60);
+  wrap.querySelectorAll('.ge,.addday').forEach(b=>b.onclick=()=>{const hh=b.dataset.h?+b.dataset.h:p.startHour;openClass(null,{day:b.dataset.day,start:pad(hh)+':00',end:pad(Math.min(hh+2,p.endHour))+':00'})});
+  wrap.querySelectorAll('[data-cid]').forEach(b=>b.onclick=()=>openClass(p.classes.find(c=>c.id===b.dataset.cid)));
+  const outside=p.classes.filter(c=>!p.days.includes(c.day)||(ui.smode!=='list'&&(toMin(c.start)<base||toMin(c.end)>p.endHour*60)));
   document.getElementById('hidden').innerHTML=outside.length?`<div class="warn">มี ${outside.length} วิชาที่อยู่นอกวันหรือช่วงเวลาที่แสดง: ${outside.map(c=>`${esc(c.code)} (${esc(c.day)} ${esc(c.start)}-${esc(c.end)})`).join(', ')} — เพิ่มวันหรือขยายช่วงเวลาเพื่อให้เห็นครบ</div>`:'';
 }
 function renderExams(){
   const p=cur(),el=document.getElementById('exams');
-  el.innerHTML=`<div><div class="exam-h">ตารางสอบ</div>
-    <div class="scroll"><table><thead><tr><th>รหัสวิชา</th><th>ชื่อรายวิชา</th><th>กลุ่ม</th><th style="text-align:center">สอบกลางภาค</th><th style="text-align:center">สอบประจำภาค</th></tr></thead>
-    <tbody>${p.exams.map(e=>`<tr class="er" data-eid="${e.id}" tabindex="0"><td class="code">${esc(e.code)}</td><td>${esc(e.nameEn)}<br><span class="th">${esc(e.nameTh)}</span></td><td>${esc(e.group)}</td><td class="when">${esc(e.mid)}</td><td class="when">${esc(e.final)}</td></tr>`).join('')||
-      `<tr><td colspan="5" class="note">ยังไม่มีวิชาในตารางสอบ กด “เพิ่มวิชาในตารางสอบ” เพื่อเริ่ม</td></tr>`}</tbody></table></div></div>
+  let list=p.exams.filter(e=>hasQ(ui.eq,e.code,e.nameEn,e.nameTh,e.group,e.mid,e.final));
+  const key={code:e=>e.code,name:e=>e.nameTh||e.nameEn,mid:e=>examTime(e.mid),final:e=>examTime(e.final)}[ui.esort]||(e=>e.code);
+  list=list.slice().sort((a,b)=>{const x=key(a),y=key(b);return typeof x==='number'?(x-y||byStr(a.code,b.code)):byStr(x,y)});
+  const now=Date.now();
+  const next=p.exams.flatMap(e=>[['สอบกลางภาค',e,examTime(e.mid),e.mid],['สอบประจำภาค',e,examTime(e.final),e.final]]).filter(x=>x[2]>now&&x[2]<Infinity).sort((a,b)=>a[2]-b[2])[0];
+  const days=next?Math.ceil((next[2]-now)/864e5):0;
+  el.innerHTML=`<div><div class="exam-h">ตารางสอบ</div></div>
+    ${next?`<div class="next"><b>สอบถัดไป</b><span>${esc(next[1].nameTh||next[1].nameEn)} · ${next[0]}</span><span class="note">${esc(String(next[3]).replace(/\n/g,' '))} · อีก ${days} วัน</span></div>`:''}
+    <div class="filters">
+      <input type="search" class="q" id="q-exam" data-ui="eq" value="${esc(ui.eq)}" placeholder="ค้นหาวิชาหรือวันสอบ" aria-label="ค้นหาตารางสอบ">
+      <select class="q" id="so-exam" data-ui="esort" aria-label="เรียงตาราง">${opt('esort','code','เรียงตามรหัสวิชา')}${opt('esort','name','เรียงตามชื่อวิชา')}${opt('esort','mid','วันสอบกลางภาคก่อน → หลัง')}${opt('esort','final','วันสอบประจำภาคก่อน → หลัง')}</select>
+      ${list.length!==p.exams.length?`<span class="count">แสดง ${list.length} จาก ${p.exams.length} วิชา</span>`:''}
+    </div>
+    <div class="scroll"><table class="cards"><thead><tr><th>รหัสวิชา</th><th>ชื่อรายวิชา</th><th>กลุ่ม</th><th style="text-align:center">สอบกลางภาค</th><th style="text-align:center">สอบประจำภาค</th></tr></thead>
+    <tbody>${list.map(e=>`<tr class="er" data-eid="${e.id}" tabindex="0"><td class="code" data-label="รหัสวิชา">${esc(e.code)}</td><td class="wide" data-label="ชื่อรายวิชา"><span>${esc(e.nameEn)}</span><span class="th">${esc(e.nameTh)}</span></td><td data-label="กลุ่ม">${esc(e.group)}</td><td class="when" data-label="สอบกลางภาค">${esc(e.mid)}</td><td class="when" data-label="สอบประจำภาค">${esc(e.final)}</td></tr>`).join('')||
+      `<tr><td colspan="5" class="note">${p.exams.length?'ไม่พบวิชาที่ค้นหา':'ยังไม่มีวิชาในตารางสอบ กด “เพิ่มวิชาในตารางสอบ” เพื่อเริ่ม'}</td></tr>`}</tbody></table></div>
     <div class="bar"><span class="legend">หมายเหตุ C = Lecture L = Lab P = โครงงาน R = ประชุม S = Self Study T = ติว</span><span class="spacer"></span><button class="btn primary" id="bAddExam">+ เพิ่มวิชาในตารางสอบ</button></div>`;
+  bindUI(el);
   el.querySelectorAll('tr.er').forEach(r=>{const o=()=>openExam(p.exams.find(e=>e.id===r.dataset.eid));r.onclick=o;r.onkeydown=ev=>{if(ev.key==='Enter')o()}});
   el.querySelector('#bAddExam').onclick=()=>openExam(null);
 }
@@ -513,100 +687,135 @@ function slotClashes(slot){
   });
   return out;
 }
+const slotMatch=s=>{const sb=sub(s.subjectId),t=tch(s.teacherId);return hasQ(ui.tq,sb&&sb.code,sb&&sb.name,t&&t.name,s.room,s.day)&&(!ui.tteacher||s.teacherId===ui.tteacher)};
 function renderTeach(){
   const T=TT(),el=document.getElementById('tSheet');
   const all=T.slots.map(s=>({s,c:slotClashes(s)})).filter(x=>x.c.length);
   const linked=T.teachers.filter(t=>t.personId&&state.people.some(p=>p.id===t.personId));
   const unlinked=T.teachers.filter(t=>!linked.includes(t)&&T.slots.some(s=>s.teacherId===t.id));
+  const shown=T.slots.filter(slotMatch).length,filtering=!!(String(ui.tq).trim()||ui.tteacher);
   el.innerHTML=`
-    <div class="sheet-title">ตารางสอนเด็ก</div>
-    <div class="bar">
-      <div class="grp"><input class="small" id="t-title" value="${esc(T.title)}" aria-label="ชื่อตารางสอน" style="width:12em"></div>
-      <div class="grp"><span class="note">เวลา</span><select class="small" id="t-sh" aria-label="เริ่ม">${hourOpts(T.startHour,6,20)}</select>–<select class="small" id="t-eh" aria-label="สิ้นสุด">${hourOpts(T.endHour,7,22)}</select></div>
-      <div class="grp"><label class="note" for="t-busy">แสดงเวลาที่ติดเรียนของ</label>
-        <select class="small" id="t-busy"><option value="">— ไม่แสดง —</option><option value="*"${T.showBusy==='*'?' selected':''}>ครูทุกคนที่เชื่อมตารางไว้</option>${linked.map(t=>`<option value="${t.id}"${T.showBusy===t.id?' selected':''}>${esc(t.name)}</option>`).join('')}</select></div>
-      <span class="spacer"></span>
-      <button class="btn" id="t-days">จัดการวัน</button>
-      <button class="btn primary" id="t-add">+ เพิ่มคาบสอน</button>
-    </div>
-    ${!T.slots.length?`<div class="status"><b>ยังไม่มีคาบสอน</b><span class="note">แตะช่องว่างในตารางเพื่อเพิ่มคาบสอน เลือกวิชาแล้วระบบจะใส่ครูผู้สอนให้ และเช็คว่าชนกับเวลาเรียนของครูไหม</span></div>`:
+    <div class="sheet-head"><div>
+        <div class="eyebrow">ตารางสอนเด็ก</div>
+        <input class="field name" id="t-title" value="${esc(T.title)}" placeholder="ชื่อตารางสอน" aria-label="ชื่อตารางสอน">
+        <div class="stats">${T.slots.length} คาบ · ${fmtH(hrs(T.slots))} ชม./สัปดาห์ · ครู ${T.teachers.length} คน</div>
+      </div>
+      <button class="btn primary" id="t-add">+ เพิ่มคาบสอน</button></div>
+    ${!T.slots.length?`<div class="status"><b>ยังไม่มีคาบสอน</b><span class="note">แตะช่องว่างในตาราง หรือกด “+ เพิ่มคาบสอน” เลือกวิชาแล้วระบบจะใส่ครูผู้สอนให้ และเช็คว่าชนกับเวลาเรียนของครูไหม</span></div>`:
       all.length?`<div class="status bad"><b>พบเวลาชน ${all.length} คาบ</b><ul>${all.map(x=>`<li data-sid="${x.s.id}">${esc(x.s.day)} ${esc(x.s.start)}-${esc(x.s.end)} ${esc(subLabel(sub(x.s.subjectId)))}: ${x.c.map(esc).join(' · ')}</li>`).join('')}</ul></div>`:
       `<div class="status ok"><b>ไม่มีคาบไหนชนกับเวลาเรียน</b><span class="note">เช็คจาก ${linked.length} ครูที่เชื่อมตารางเรียนไว้</span></div>`}
-    ${unlinked.length?`<div class="warn">ยังเช็คไม่ได้สำหรับ ${unlinked.map(t=>esc(t.name)).join(', ')} เพราะยังไม่ได้เชื่อมกับตารางเรียน (ตั้งค่าในส่วน “ครูผู้สอน” ด้านล่าง)</div>`:''}
-    <div class="scroll"><div class="grid" id="tGrid"></div></div>
-    <div class="note">ช่องที่มีกรอบแดงคือคาบที่ชน ช่องลายทางคือเวลาที่ครูติดเรียน</div>`;
+    ${unlinked.length?`<div class="warn">ยังเช็คเวลาเรียนไม่ได้สำหรับ ${unlinked.map(t=>esc(t.name)).join(', ')} เพราะยังไม่ได้เชื่อมกับตารางเรียน (ตั้งค่าในส่วน “ครูผู้สอน”)</div>`:''}
+    <div class="filters">
+      <input type="search" class="q" id="q-teach" data-ui="tq" value="${esc(ui.tq)}" placeholder="ค้นหาวิชา ครู หรือห้อง" aria-label="ค้นหาคาบสอน">
+      <select class="q" id="f-tteacher" data-ui="tteacher" aria-label="กรองตามครู">${opt('tteacher','','ครูทุกคน')}${T.teachers.map(t=>opt('tteacher',t.id,esc(t.name))).join('')}</select>
+      <select class="q" id="t-busy" aria-label="แสดงเวลาที่ครูติดเรียน"><option value="">ไม่แสดงเวลาติดเรียน</option><option value="*"${T.showBusy==='*'?' selected':''}>แสดงเวลาติดเรียน: ครูทุกคน</option>${linked.map(t=>`<option value="${t.id}"${T.showBusy===t.id?' selected':''}>แสดงเวลาติดเรียน: ${esc(t.name)}</option>`).join('')}</select>
+      ${seg('tmode',[['grid','ตาราง'],['list','รายการ']])}
+    </div>
+    ${filtering?`<div class="count">แสดง ${shown} จาก ${T.slots.length} คาบ</div>`:''}
+    <div id="tGridWrap"></div>
+    <div class="bar">
+      <div class="grp"><span class="note">ช่วงเวลาที่แสดง</span><select class="small" id="t-sh" aria-label="เริ่ม">${hourOpts(T.startHour,6,20)}</select>–<select class="small" id="t-eh" aria-label="สิ้นสุด">${hourOpts(T.endHour,7,22)}</select></div>
+      <button class="btn" id="t-days">จัดการวัน</button>
+      <span class="spacer"></span><span class="note">กรอบแดง = คาบที่ชน · ลายทาง = เวลาที่ครูติดเรียน</span>
+    </div>`;
+  bindUI(el);
   el.querySelector('#t-title').oninput=e=>{T.title=e.target.value;save()};
   const sh=el.querySelector('#t-sh'),eh=el.querySelector('#t-eh');
   sh.onchange=()=>{T.startHour=+sh.value;if(T.endHour<=T.startHour)T.endHour=T.startHour+1;commit()};
   eh.onchange=()=>{T.endHour=+eh.value;if(T.endHour<=T.startHour)T.startHour=T.endHour-1;commit()};
   el.querySelector('#t-busy').onchange=e=>{T.showBusy=e.target.value;commit()};
   el.querySelector('#t-days').onclick=()=>openDays(T,T.slots);
-  el.querySelector('#t-add').onclick=()=>openSlot(null,{day:T.days[0]||'จันทร์',start:pad(T.startHour)+':00',end:pad(T.startHour+1)+':00'});
+  el.querySelector('#t-add').onclick=()=>openSlot(null,{day:T.days[0]||'จันทร์',start:pad(T.startHour)+':00',end:pad(T.startHour+1)+':00',teacherId:ui.tteacher});
   el.querySelectorAll('li[data-sid]').forEach(li=>li.onclick=()=>openSlot(T.slots.find(s=>s.id===li.dataset.sid)));
-  const clashIds=new Set(all.map(x=>x.s.id));
-  const items=T.slots.map(s=>{const sb=sub(s.subjectId),t=tch(s.teacherId);return {day:s.day,start:s.start,end:s.end,cls:clashIds.has(s.id)?'clash':'',
+  const clashIds=new Set(all.map(x=>x.s.id)),list=ui.tmode==='list';
+  const items=T.slots.map(s=>{const sb=sub(s.subjectId),t=tch(s.teacherId),cl=clashIds.has(s.id);return {day:s.day,start:s.start,end:s.end,color:t?t.color:'slate',hide:!slotMatch(s),cls:cl?'clash':'',
     attrs:`data-c="${esc(t?t.color:'slate')}" data-sid="${s.id}"`,
-    html:`<span>${clashIds.has(s.id)?'⚠ ':''}<span class="code">${esc(sb&&sb.code||'')}</span></span><span>${esc(sb?sb.name:'(ไม่ระบุวิชา)')}</span><span class="who">${esc(t?t.name:'')}</span>${s.room?`<span>${esc(s.room)}</span>`:''}`}});
+    html:`<span>${cl?'⚠ ':''}<span class="code">${esc(sb&&sb.code||'')}</span>${list&&sb?' '+esc(sb.name):''}</span>${list?'':`<span>${esc(sb?sb.name:'(ไม่ระบุวิชา)')}</span>`}<span class="who">${esc(t?t.name:'')}</span>${s.room?`<span>${esc(s.room)}</span>`:''}${list&&cl?`<span class="warn">${slotClashes(s).map(esc).join('<br>')}</span>`:''}`}});
   const busyT=T.showBusy==='*'?linked:linked.filter(t=>t.id===T.showBusy);
   busyT.forEach(t=>{const p=state.people.find(x=>x.id===t.personId);p.classes.forEach(c=>items.push({day:c.day,start:c.start,end:c.end,tag:'div',cls:'busy',
-    attrs:`title="${esc(t.name)} ติดเรียน ${esc(c.code)} ${esc(c.dates)}"`,html:`<span class="who">${esc(t.name)} ติดเรียน</span><span>${esc(c.code)}</span><span>${esc(c.start)}-${esc(c.end)}</span>`}))});
-  const g=document.getElementById('tGrid');
-  gridHTML(g,{startHour:T.startHour,endHour:T.endHour,days:T.days,items});
-  g.querySelectorAll('.ge').forEach(b=>b.onclick=()=>{const hh=+b.dataset.h;openSlot(null,{day:b.dataset.day,start:pad(hh)+':00',end:pad(Math.min(hh+1,T.endHour))+':00'})});
-  g.querySelectorAll('[data-sid]').forEach(b=>b.onclick=()=>openSlot(T.slots.find(s=>s.id===b.dataset.sid)));
+    attrs:`title="${esc(t.name)} ติดเรียน ${esc(c.code)} ${esc(c.dates)}"`,html:`<span class="who">${esc(t.name)} ติดเรียน</span><span>${esc(c.code)}</span>${list?'':`<span>${esc(c.start)}-${esc(c.end)}</span>`}`}))});
+  const wrap=document.getElementById('tGridWrap');
+  drawTimetable(wrap,ui.tmode,{startHour:T.startHour,endHour:T.endHour,days:T.days,items,addLabel:'เพิ่มคาบสอน'});
+  wrap.querySelectorAll('.ge,.addday').forEach(b=>b.onclick=()=>{const hh=b.dataset.h?+b.dataset.h:T.startHour;openSlot(null,{day:b.dataset.day,start:pad(hh)+':00',end:pad(Math.min(hh+1,T.endHour))+':00',teacherId:ui.tteacher})});
+  wrap.querySelectorAll('[data-sid]').forEach(b=>b.onclick=()=>openSlot(T.slots.find(s=>s.id===b.dataset.sid)));
   renderSubjects();renderTeachers();
 }
 function teacherOpts(sel){return `<option value="">— ไม่ระบุ —</option>`+TT().teachers.map(t=>`<option value="${t.id}"${t.id===sel?' selected':''}>${esc(t.name)}</option>`).join('')}
 function renderSubjects(){
   const T=TT(),el=document.getElementById('tSubjects');
-  const placed=s=>T.slots.filter(x=>x.subjectId===s.id).reduce((a,x)=>a+(toMin(x.end)-toMin(x.start))/60,0);
-  const groups=[...new Set(T.subjects.map(s=>s.type||'อื่น ๆ'))];
+  const placed=s=>hrs(T.slots.filter(x=>x.subjectId===s.id));
+  const groups=[...new Set(T.subjects.map(s=>s.type||'อื่น ๆ'))].filter(g=>!ui.stype||g===ui.stype);
+  const tname=s=>{const t=tch(s.teacherId);return t?t.name:''};
+  const keep=s=>hasQ(ui.sq,s.code,s.name,tname(s))&&(!ui.spending||placed(s)<perWeek(s));
+  const order=new Map(T.subjects.map((s,i)=>[s.id,i]));
+  const cmp={order:(a,b)=>order.get(a.id)-order.get(b.id),code:(a,b)=>byStr(a.code,b.code),name:(a,b)=>byStr(a.name,b.name),teacher:(a,b)=>byStr(tname(a),tname(b))||byStr(a.code,b.code),
+    missing:(a,b)=>(perWeek(b)-placed(b))-(perWeek(a)-placed(a))||order.get(a.id)-order.get(b.id)}[ui.ssort]||((a,b)=>order.get(a.id)-order.get(b.id));
+  const visible=T.subjects.filter(s=>(!ui.stype||(s.type||'อื่น ๆ')===ui.stype)&&keep(s)).length;
   const row=s=>{const need=perWeek(s),got=placed(s);const cls=need&&got===need?'done':got>need?'over':'';
-    return `<tr data-sub="${s.id}"><td><input class="tin cd" data-f="code" value="${esc(s.code)}" aria-label="รหัสวิชา"></td>
-    <td><input class="tin" data-f="name" value="${esc(s.name)}" aria-label="ชื่อวิชา" style="min-width:11em"></td>
-    <td><input class="tin num" data-f="credits" value="${esc(s.credits)}" inputmode="decimal" aria-label="หน่วยกิต"></td>
-    <td><input class="tin num" data-f="hours" value="${esc(s.hours)}" inputmode="numeric" aria-label="ชั่วโมง"></td>
-    <td class="mid"><span class="pill ${cls}">${got}/${need} คาบ</span></td>
-    <td><select class="tin" data-f="teacherId" aria-label="ครูผู้สอน">${teacherOpts(s.teacherId)}</select></td>
-    <td class="mid"><button class="ib" data-delsub="${s.id}" aria-label="ลบวิชา">✕</button></td></tr>`};
-  el.innerHTML=`<div><div class="exam-h">รายวิชา ${esc(T.title)}</div>
-    <div class="scroll"><table><thead><tr><th>รหัสวิชา</th><th>ชื่อวิชา</th><th>น.ก.</th><th>ชม.</th><th>จัดแล้ว/ต่อสัปดาห์</th><th>ครูผู้สอน</th><th></th></tr></thead><tbody>
-    ${groups.map(gname=>{const list=T.subjects.filter(s=>(s.type||'อื่น ๆ')===gname);
-      const cr=list.reduce((a,s)=>a+(+s.credits||0),0),hr=list.reduce((a,s)=>a+(+s.hours||0),0);
-      return `<tr class="grp"><td colspan="7">รายวิชา${esc(gname)}</td></tr>${list.map(row).join('')}<tr><td></td><td class="note">รวมรายวิชา${esc(gname)}</td><td>${cr.toFixed(1)}</td><td>${hr}</td><td colspan="3"></td></tr>`}).join('')}
-    </tbody></table></div></div>
+    return `<tr data-sub="${s.id}"><td data-label="รหัสวิชา"><input class="tin cd" data-f="code" value="${esc(s.code)}" aria-label="รหัสวิชา"></td>
+    <td class="wide" data-label="ชื่อวิชา"><input class="tin" data-f="name" value="${esc(s.name)}" aria-label="ชื่อวิชา" style="min-width:10em"></td>
+    <td data-label="หน่วยกิต"><input class="tin num" data-f="credits" value="${esc(s.credits)}" inputmode="decimal" aria-label="หน่วยกิต"></td>
+    <td data-label="ชั่วโมง"><input class="tin num" data-f="hours" value="${esc(s.hours)}" inputmode="numeric" aria-label="ชั่วโมง"></td>
+    <td class="mid" data-label="จัดแล้ว"><span class="pill ${cls}">${fmtH(got)}/${need} คาบ</span></td>
+    <td class="span2" data-label="ครูผู้สอน"><select class="tin" data-f="teacherId" aria-label="ครูผู้สอน">${teacherOpts(s.teacherId)}</select></td>
+    <td class="mid act"><button class="ib" data-delsub="${s.id}" aria-label="ลบวิชา">✕</button></td></tr>`};
+  el.innerHTML=`<div><div class="exam-h">รายวิชา ${esc(T.title)}</div></div>
+    <div class="filters">
+      <input type="search" class="q" id="q-sub" data-ui="sq" value="${esc(ui.sq)}" placeholder="ค้นหารหัส ชื่อวิชา หรือครู" aria-label="ค้นหารายวิชา">
+      <select class="q" id="f-stype" data-ui="stype" aria-label="ประเภทวิชา">${opt('stype','','ทุกประเภท')}${opt('stype','พื้นฐาน','รายวิชาพื้นฐาน')}${opt('stype','เพิ่มเติม','รายวิชาเพิ่มเติม')}</select>
+      <select class="q" id="so-sub" data-ui="ssort" aria-label="เรียงรายวิชา">${opt('ssort','order','เรียงตามหลักสูตร')}${opt('ssort','code','เรียงตามรหัสวิชา')}${opt('ssort','name','เรียงตามชื่อวิชา')}${opt('ssort','teacher','เรียงตามครู')}${opt('ssort','missing','ยังขาดคาบมากที่สุดก่อน')}</select>
+      <label class="qcheck"><input type="checkbox" class="q" id="f-spending" data-ui="spending"${ui.spending?' checked':''}> เฉพาะที่ยังจัดไม่ครบ</label>
+      ${visible!==T.subjects.length?`<span class="count">แสดง ${visible} จาก ${T.subjects.length} วิชา</span>`:''}
+    </div>
+    <div class="scroll"><table class="cards"><thead><tr><th>รหัสวิชา</th><th>ชื่อวิชา</th><th>น.ก.</th><th>ชม.</th><th>จัดแล้ว/ต่อสัปดาห์</th><th>ครูผู้สอน</th><th></th></tr></thead><tbody>
+    ${groups.map(gname=>{const full=T.subjects.filter(s=>(s.type||'อื่น ๆ')===gname),list=full.filter(keep).sort(cmp);
+      const cr=full.reduce((a,s)=>a+(+s.credits||0),0),hr=full.reduce((a,s)=>a+(+s.hours||0),0);
+      return `<tr class="grp"><td colspan="7">รายวิชา${esc(gname)}</td></tr>${list.map(row).join('')||'<tr class="sum"><td colspan="7" class="note">ไม่มีวิชาที่ตรงกับตัวกรอง</td></tr>'}<tr class="sum"><td colspan="7" class="note">รวมรายวิชา${esc(gname)} ${cr.toFixed(1)} หน่วยกิต · ${hr} ชม.</td></tr>`}).join('')}
+    </tbody></table></div>
     <div class="bar"><span class="note">คาบต่อสัปดาห์คิดจาก ชม. ÷ 20 สัปดาห์ (60 ชม. = 3 คาบ, 20 ชม. = 1 คาบ)</span><span class="spacer"></span>
-      <select class="small" id="ns-type" aria-label="ประเภทวิชา"><option>พื้นฐาน</option><option>เพิ่มเติม</option></select>
+      <select class="small" id="ns-type" aria-label="ประเภทวิชาใหม่"><option>พื้นฐาน</option><option>เพิ่มเติม</option></select>
       <button class="btn primary" id="ns-add">+ เพิ่มรายวิชา</button></div>`;
+  bindUI(el);
   el.querySelectorAll('tr[data-sub]').forEach(tr=>{const s=sub(tr.dataset.sub);
     tr.querySelectorAll('[data-f]').forEach(i=>{const f=i.dataset.f;
       i.oninput=()=>{s[f]=(f==='credits'||f==='hours')?(i.value===''?'':+i.value||0):i.value;save()};
       i.onchange=()=>commit()})});
   el.querySelectorAll('[data-delsub]').forEach(b=>{b.onclick=()=>{if(b.classList.contains('armed')){const id=b.dataset.delsub;T.subjects=T.subjects.filter(s=>s.id!==id);T.slots=T.slots.filter(x=>x.subjectId!==id);commit();toast('ลบวิชาแล้ว')}else{b.classList.add('armed');b.textContent='ลบ?';b.style.width='auto';b.style.color='var(--danger)';setTimeout(()=>{b.classList.remove('armed');b.textContent='✕';b.style.width='';b.style.color=''},3000)}}});
-  el.querySelector('#ns-add').onclick=()=>{T.subjects.push({id:uid(),type:el.querySelector('#ns-type').value,code:'',name:'วิชาใหม่',credits:0.5,hours:20,teacherId:''});commit();
-    const ins=document.querySelectorAll('#tSubjects tr[data-sub] [data-f="name"]');const last=[...ins].find(i=>i.value==='วิชาใหม่');last&&(last.focus(),last.select())};
+  el.querySelector('#ns-add').onclick=()=>{const type=el.querySelector('#ns-type').value;T.subjects.push({id:uid(),type,code:'',name:'วิชาใหม่',credits:0.5,hours:20,teacherId:''});
+    Object.assign(ui,{sq:'',spending:false,stype:''});saveUI();commit();
+    const last=[...document.querySelectorAll('#tSubjects [data-f="name"]')].find(i=>i.value==='วิชาใหม่');last&&(last.focus(),last.select())};
 }
 function renderTeachers(){
   const T=TT(),el=document.getElementById('tTeachers');
-  el.innerHTML=`<div class="sheet-title">ครูผู้สอน</div>
-    <p class="note" style="margin:0">เชื่อมครูแต่ละคนกับตารางเรียน (มหาลัย) ของคนนั้น เพื่อให้เช็คว่าคาบสอนชนกับเวลาเรียนไหม ครูที่ไม่ได้เรียน เช่น อาจารย์ประจำ ไม่ต้องเชื่อมก็ได้</p>
-    <div class="scroll"><table><thead><tr><th>ชื่อครู</th><th>สอนวิชา</th><th>ตารางเรียนของคนนี้</th><th>คาบ/สัปดาห์</th><th></th></tr></thead><tbody>
-    ${T.teachers.map(t=>{const subs=T.subjects.filter(s=>s.teacherId===t.id);const n=T.slots.filter(s=>s.teacherId===t.id).reduce((a,x)=>a+(toMin(x.end)-toMin(x.start))/60,0);
-      return `<tr data-tid="${t.id}"><td class="mid"><span class="dot" style="background:var(--b-${esc(t.color)})"></span><input class="tin" data-tf="name" value="${esc(t.name)}" aria-label="ชื่อครู" style="width:8em"></td>
-      <td class="mid">${subs.map(s=>esc(s.name)).join(', ')||'<span class="note">—</span>'}</td>
-      <td><select class="tin" data-tf="personId" aria-label="ตารางเรียนของ ${esc(t.name)}"><option value="">— ไม่ได้เชื่อม —</option>${state.people.map(p=>`<option value="${p.id}"${p.id===t.personId?' selected':''}>${esc(p.name)}</option>`).join('')}<option value="__new">+ สร้างตารางเรียนใหม่ชื่อ “${esc(t.name)}”</option></select></td>
-      <td class="mid">${n}</td>
-      <td class="mid"><button class="ib" data-deltch="${t.id}" aria-label="ลบครู">✕</button></td></tr>`}).join('')}
-    </tbody></table></div>
-    <div class="bar"><span class="spacer"></span><button class="btn primary" id="nt-add">+ เพิ่มครู</button></div>`;
+  const info=T.teachers.map((t,i)=>{const sl=T.slots.filter(s=>s.teacherId===t.id);return {t,i,subs:T.subjects.filter(s=>s.teacherId===t.id),h:hrs(sl),cl:sl.filter(s=>slotClashes(s).length).length}});
+  const pname=t=>{const p=state.people.find(x=>x.id===t.personId);return p?p.name:''};
+  let list=info.filter(x=>hasQ(ui.teq,x.t.name,pname(x.t),...x.subs.map(s=>s.name)));
+  list.sort({order:(a,b)=>a.i-b.i,name:(a,b)=>byStr(a.t.name,b.t.name),hours:(a,b)=>b.h-a.h||a.i-b.i,clash:(a,b)=>b.cl-a.cl||a.i-b.i}[ui.tesort]||((a,b)=>a.i-b.i));
+  el.innerHTML=`<div class="sheet-head"><div><div class="sheet-title">ครูผู้สอน</div>
+      <p class="note" style="margin:0">เชื่อมครูแต่ละคนกับตารางเรียน (มหาลัย) ของคนนั้น เพื่อให้เช็คว่าคาบสอนชนกับเวลาเรียนไหม ครูที่ไม่ได้เรียน เช่น อาจารย์ประจำ ไม่ต้องเชื่อมก็ได้</p></div>
+      <button class="btn primary" id="nt-add">+ เพิ่มครู</button></div>
+    <div class="filters">
+      <input type="search" class="q" id="q-tch" data-ui="teq" value="${esc(ui.teq)}" placeholder="ค้นหาชื่อครูหรือวิชา" aria-label="ค้นหาครู">
+      <select class="q" id="so-tch" data-ui="tesort" aria-label="เรียงครู">${opt('tesort','order','เรียงตามลำดับที่เพิ่ม')}${opt('tesort','name','ชื่อ ก → ฮ')}${opt('tesort','hours','สอนมาก → น้อย')}${opt('tesort','clash','คาบชนมากที่สุดก่อน')}</select>
+      ${list.length!==info.length?`<span class="count">แสดง ${list.length} จาก ${info.length} คน</span>`:''}
+    </div>
+    <div class="scroll"><table class="cards"><thead><tr><th>ชื่อครู</th><th>สอนวิชา</th><th>ตารางเรียนของคนนี้</th><th>คาบ/สัปดาห์</th><th>ชน</th><th></th></tr></thead><tbody>
+    ${list.map(({t,subs,h,cl})=>`<tr data-tid="${t.id}"><td class="mid wide" data-label="ชื่อครู"><span style="display:flex;align-items:center"><span class="dot" style="background:var(--b-${esc(t.color)})"></span><input class="tin" data-tf="name" value="${esc(t.name)}" aria-label="ชื่อครู" style="width:9em"></span></td>
+      <td class="mid wide" data-label="สอนวิชา">${subs.map(s=>esc(s.name)).join(', ')||'<span class="note">—</span>'}</td>
+      <td class="wide" data-label="ตารางเรียนของคนนี้"><select class="tin" data-tf="personId" aria-label="ตารางเรียนของ ${esc(t.name)}"><option value="">— ไม่ได้เชื่อม —</option>${state.people.map(p=>`<option value="${p.id}"${p.id===t.personId?' selected':''}>${esc(p.name)}</option>`).join('')}<option value="__new">+ สร้างตารางเรียนใหม่ชื่อ “${esc(t.name)}”</option></select></td>
+      <td class="mid" data-label="คาบ/สัปดาห์">${fmtH(h)}</td>
+      <td class="mid" data-label="คาบที่ชน">${cl?`<span class="pill over">${cl}</span>`:'<span class="note">0</span>'}</td>
+      <td class="mid act"><button class="ib" data-deltch="${t.id}" aria-label="ลบครู">✕</button></td></tr>`).join('')||'<tr class="sum"><td colspan="6" class="note">ไม่พบครูที่ค้นหา</td></tr>'}
+    </tbody></table></div>`;
+  bindUI(el);
   el.querySelectorAll('tr[data-tid]').forEach(tr=>{const t=tch(tr.dataset.tid);
     const nm=tr.querySelector('[data-tf=name]');nm.oninput=()=>{t.name=nm.value;save()};nm.onchange=()=>commit();
     tr.querySelector('[data-tf=personId]').onchange=e=>{let v=e.target.value;
       if(v==='__new'){const p=person(t.name,{advisor:''});state.people.push(p);v=p.id;toast('สร้างตารางเรียนของ '+t.name+' แล้ว ไปกรอกวิชาที่แท็บตารางเรียน')}
       t.personId=v;commit()}});
-  el.querySelectorAll('[data-deltch]').forEach(b=>{b.onclick=()=>{if(b.classList.contains('armed')){const id=b.dataset.deltch;T.teachers=T.teachers.filter(t=>t.id!==id);T.subjects.forEach(s=>{if(s.teacherId===id)s.teacherId=''});T.slots.forEach(s=>{if(s.teacherId===id)s.teacherId=''});commit()}else{b.classList.add('armed');b.textContent='ลบ?';b.style.width='auto';b.style.color='var(--danger)';setTimeout(()=>{b.classList.remove('armed');b.textContent='✕';b.style.width='';b.style.color=''},3000)}}});
+  el.querySelectorAll('[data-deltch]').forEach(b=>{b.onclick=()=>{if(b.classList.contains('armed')){const id=b.dataset.deltch;T.teachers=T.teachers.filter(t=>t.id!==id);T.subjects.forEach(s=>{if(s.teacherId===id)s.teacherId=''});T.slots.forEach(s=>{if(s.teacherId===id)s.teacherId=''});if(ui.tteacher===id){ui.tteacher='';saveUI()}commit()}else{b.classList.add('armed');b.textContent='ลบ?';b.style.width='auto';b.style.color='var(--danger)';setTimeout(()=>{b.classList.remove('armed');b.textContent='✕';b.style.width='';b.style.color=''},3000)}}});
   el.querySelector('#nt-add').onclick=()=>{const used=T.teachers.map(t=>t.color);const c=(COLORS.find(([k])=>!used.includes(k))||COLORS[T.teachers.length%COLORS.length])[0];
-    T.teachers.push({id:uid(),name:'ครูใหม่',color:c,personId:''});commit();const ins=[...document.querySelectorAll('#tTeachers [data-tf=name]')].pop();ins&&(ins.focus(),ins.select())};
+    T.teachers.push({id:uid(),name:'ครูใหม่',color:c,personId:''});ui.teq='';saveUI();commit();const ins=[...document.querySelectorAll('#tTeachers [data-tf=name]')].pop();ins&&(ins.focus(),ins.select())};
 }
 function openSlot(s,preset){
   const T=TT(),isNew=!s,d=s||Object.assign({subjectId:'',teacherId:'',room:''},preset);
@@ -680,7 +889,7 @@ function applyRows(rows){
     else{const i=state.people.findIndex(p=>p.id===r.data.id);if(i<0)state.people.push(r.data);else state.people[i]=r.data}});
   state.people.sort((a,b)=>(cloud.sort.get('p_'+a.id)??1e9)-(cloud.sort.get('p_'+b.id)??1e9));
 }
-function busy(){const a=document.activeElement;return !!document.getElementById('modalRoot').firstChild||!!(a&&a.matches('input,textarea,select')&&a.closest('#vStudy,#vTeach'))}
+function busy(){const a=document.activeElement;return !!document.getElementById('modalRoot').firstChild||!!(a&&a.matches('input,textarea,select')&&!a.classList.contains('q')&&a.closest('#vStudy,#vTeach'))}
 function onRemote(pl){remoteQ.push(pl);tryFlush()}
 function tryFlush(){
   if(!cloud||!remoteQ.length||busy())return;
