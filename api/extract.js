@@ -1,5 +1,6 @@
 // Reads timetable screenshots (e.g. from reg.sut.ac.th) with AI and returns structured classes and exams.
-// Set GEMINI_API_KEY (free tier) or ANTHROPIC_API_KEY in Vercel; AI_PROVIDER=gemini|anthropic forces one.
+// Set GEMINI_API_KEY (free tier) and/or ANTHROPIC_API_KEY in Vercel. Every usable model is tried in turn until one
+// answers: the Gemini models this key can use first, then Claude. AI_PROVIDER=gemini|anthropic limits it to one provider.
 import Anthropic from '@anthropic-ai/sdk';
 
 const DAYS = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
@@ -75,12 +76,18 @@ The exam table (ตารางสอบ) lists code, English and Thai names, gr
 Copy codes, rooms and Thai text exactly as printed. Never invent a class that is not in the images. If several images are given, they belong to the same student: merge them and do not duplicate entries.`;
 
 
-// ---------- Google Gemini (has a free tier: key from https://aistudio.google.com/apikey) ----------
-const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 class AIError extends Error {
-  constructor(status, error, detail = '') { super(error); this.status = status; this.error = error; this.detail = detail; }
+  // fatal: the problem is the key or account, so trying another model of the same provider will not help.
+  constructor(status, error, detail = '', fatal = false) { super(error); Object.assign(this, { status, error, detail, fatal }); }
 }
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const DEADLINE_MS = 105_000; // stay inside the 120 s function limit
+const userText = (n) => `Transcribe the class timetable and exam table in ${n > 1 ? 'these images' : 'this image'}. Reply with JSON only.`;
+
+// ---------- Google Gemini (free tier: key from https://aistudio.google.com/apikey) ----------
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 // Gemini's responseSchema uses an OpenAPI subset: upper-case types and no additionalProperties.
 function toGeminiSchema(node) {
@@ -107,78 +114,162 @@ async function geminiFetch(path, key, body) {
   return { ok: r.ok, status: r.status, json: j, message: j?.error?.message || '' };
 }
 
-// Flash models this key can use, newest first; full Flash before Flash-Lite.
-async function listFlashModels(key) {
-  const { ok, json } = await geminiFetch('models?pageSize=200', key);
+// Every model this key can call that can read an image and write text, best guess first:
+// Flash, then Flash-Lite, then Pro, then previews, then everything else (e.g. Gemma).
+async function listGeminiModels(key) {
+  const { ok, json } = await geminiFetch('models?pageSize=1000', key);
   if (!ok) return [];
   const names = (json.models || [])
     .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
     .map((m) => m.name.replace(/^models\//, ''))
-    .filter((n) => /flash/.test(n) && !/(image|tts|live|audio|thinking|exp|embedding)/.test(n));
-  const rank = (n) => (/lite/.test(n) ? 1 : 0) + (/preview/.test(n) ? 2 : 0);
-  return names.sort((x, y) => rank(x) - rank(y) || y.localeCompare(x));
+    .filter((n) => !/(image|tts|live|audio|embedding|aqa|imagen|veo|learnlm|computer|robotics|native)/.test(n));
+  const rank = (n) => (/flash/.test(n) ? (/lite/.test(n) ? 1 : 0) : /pro/.test(n) ? 2 : 4) + (/(preview|exp)/.test(n) ? 3 : 0);
+  return [...new Set(names)].sort((x, y) => rank(x) - rank(y) || y.localeCompare(x));
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const BUSY = new Set([429, 500, 503, 504]);
-const DEADLINE_MS = 100_000; // stay inside the 120 s function limit
+function geminiError(r, model) {
+  const m = r.message;
+  if (r.status === 400 && /api key/i.test(m)) return new AIError(500, 'GEMINI_API_KEY ไม่ถูกต้อง ตรวจสอบใน Vercel', m, true);
+  if (r.status === 403 && /api key|permission|disabled|billing/i.test(m)) return new AIError(500, 'GEMINI_API_KEY ไม่มีสิทธิ์ใช้งาน Gemini API', m, true);
+  if (r.status === 429) return new AIError(429, 'ใช้โควตาฟรีของ Gemini หมดแล้ว รอสักครู่ (หรือพรุ่งนี้) แล้วลองใหม่', `${model}: ${m}`);
+  if ([500, 503, 504].includes(r.status)) return new AIError(503, 'ตอนนี้ AI ฟรีของ Google มีคนใช้เยอะ ลองใหม่อีกครั้งในอีก 1–2 นาที', `${model}: ${m}`);
+  return new AIError(502, `AI ตอบกลับผิดพลาด (${r.status})`, `${model}: ${m}`);
+}
 
-async function extractWithGemini(images, key) {
-  const started = Date.now();
-  const first = process.env.GEMINI_MODEL || 'gemini-flash-latest';
+async function geminiOnce(model, images, key, withSchema) {
   const body = {
     systemInstruction: { parts: [{ text: SYSTEM }] },
-    contents: [{
-      role: 'user',
-      parts: [
-        ...images.map((img) => ({ inlineData: { mimeType: img.mediaType, data: img.data } })),
-        { text: `Transcribe the class timetable and exam table in ${images.length > 1 ? 'these images' : 'this image'}. Reply with JSON only.` },
-      ],
-    }],
-    generationConfig: { responseMimeType: 'application/json', responseSchema: toGeminiSchema(SCHEMA), maxOutputTokens: 32000 },
+    contents: [{ role: 'user', parts: [
+      ...images.map((img) => ({ inlineData: { mimeType: img.mediaType, data: img.data } })),
+      { text: userText(images.length) + (withSchema ? '' : `\nUse exactly this JSON schema:\n${JSON.stringify(SCHEMA)}`) },
+    ] }],
+    generationConfig: withSchema
+      ? { responseMimeType: 'application/json', responseSchema: toGeminiSchema(SCHEMA), maxOutputTokens: 32000 }
+      : { maxOutputTokens: 32000 },
   };
-
-  // Try the configured model (one retry when busy), then other Flash models when it is busy or missing.
-  let queue = [first, first];
-  let others = null;
-  let model = first;
-  let r = null;
-  const tried = new Set();
-  while (queue.length && Date.now() - started < DEADLINE_MS) {
-    model = queue.shift();
-    if (tried.has(model) && model !== first) continue;
-    if (tried.has(model)) await sleep(2500);
-    tried.add(model);
-    r = await geminiFetch(`models/${model}:generateContent`, key, body);
-    if (r.ok) break;
-    const quota = r.status === 429 && /quota|exhausted|limit/i.test(r.message);
-    if (r.status !== 404 && !BUSY.has(r.status)) break;
-    if (r.status === 404 && model === first) queue = queue.filter((m) => m !== first);
-    console.warn('Gemini', r.status, model, r.message);
-    if (!others) {
-      others = (await listFlashModels(key)).filter((m) => m !== first);
-      queue.push(...others.slice(0, 3));
-    }
-    if (quota && !queue.length) break;
-  }
-  if (!r.ok) {
-    console.error('Gemini error', r.status, model, r.message);
-    if (r.status === 429) throw new AIError(429, 'ใช้โควตาฟรีของ Gemini หมดแล้ว รอสักครู่ (หรือพรุ่งนี้) แล้วลองใหม่', r.message);
-    if (BUSY.has(r.status)) throw new AIError(503, 'ตอนนี้ AI ฟรีของ Google มีคนใช้เยอะ ลองใหม่อีกครั้งในอีก 1–2 นาที', r.message);
-    if (r.status === 400 && /api key/i.test(r.message)) throw new AIError(500, 'GEMINI_API_KEY ไม่ถูกต้อง ตรวจสอบใน Vercel', r.message);
-    if (r.status === 403) throw new AIError(500, 'GEMINI_API_KEY ไม่มีสิทธิ์ใช้งาน Gemini API', r.message);
-    if (r.status === 404) throw new AIError(502, `ไม่พบโมเดล ${model}: ตั้งค่า GEMINI_MODEL ใน Vercel`, r.message);
-    throw new AIError(502, `AI ตอบกลับผิดพลาด (${r.status})`, r.message);
-  }
+  // Some models (e.g. Gemma) reject system instructions or JSON mode; fold the instructions into the prompt for those.
+  if (!withSchema) { body.contents[0].parts.unshift({ text: SYSTEM }); delete body.systemInstruction; }
+  const r = await geminiFetch(`models/${model}:generateContent`, key, body);
+  if (!r.ok) throw geminiError(r, model);
   const cand = r.json?.candidates?.[0];
-  if (!cand) throw new AIError(422, 'AI อ่านรูปนี้ไม่ได้ ลองใช้รูปหน้าตารางเรียนจากระบบทะเบียน', r.json?.promptFeedback?.blockReason || '');
-  if (cand.finishReason === 'MAX_TOKENS') throw new AIError(422, 'ตารางยาวเกินไป ลองอัปโหลดทีละรูป');
-  const text = (cand.content?.parts || []).map((p) => p.text || '').join('');
-  try { return JSON.parse(text); } catch { throw new AIError(502, 'AI ส่งข้อมูลกลับมาไม่ครบ ลองใหม่อีกครั้ง', cand.finishReason || ''); }
+  if (!cand) throw new AIError(422, 'AI อ่านรูปนี้ไม่ได้ ลองใช้รูปหน้าตารางเรียนจากระบบทะเบียน', `${model}: ${r.json?.promptFeedback?.blockReason || 'no candidates'}`);
+  if (cand.finishReason === 'MAX_TOKENS') throw new AIError(422, 'ตารางยาวเกินไป ลองอัปโหลดทีละรูป', model);
+  const text = (cand.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || '').join('');
+  const json = text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1);
+  try { return JSON.parse(json); } catch { throw new AIError(502, 'AI ส่งข้อมูลกลับมาไม่ครบ ลองใหม่อีกครั้ง', `${model}: ${cand.finishReason || ''}`); }
 }
 
+// ---------- Claude (paid) ----------
 function apiMessage(err) {
   return err?.error?.error?.message || err?.message || '';
+}
+
+async function extractWithClaude(images) {
+  // A key that is not scoped to a workspace must name one; set ANTHROPIC_WORKSPACE_ID in Vercel for that case.
+  const workspace = process.env.ANTHROPIC_WORKSPACE_ID;
+  const client = new Anthropic(workspace ? { defaultHeaders: { 'anthropic-workspace-id': workspace } } : {});
+  const content = [
+    ...images.map((img) => ({ type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } })),
+    { type: 'text', text: userText(images.length) },
+  ];
+  const request = {
+    model: 'claude-opus-5-5',
+    max_tokens: 32000,
+    system: SYSTEM,
+    output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
+    messages: [{ role: 'user', content }],
+  };
+  try {
+    let message;
+    try {
+      message = await client.beta.messages.stream({ ...request, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' }).finalMessage();
+    } catch (err) {
+      // Some accounts cannot use server-side fallbacks yet; retry the same request without them.
+      if (!(err instanceof Anthropic.BadRequestError) || !/fallback|beta/i.test(apiMessage(err))) throw err;
+      message = await client.beta.messages.stream(request).finalMessage();
+    }
+    if (message.stop_reason === 'refusal') throw new AIError(422, 'AI อ่านรูปนี้ไม่ได้ ลองใช้รูปหน้าตารางเรียนจากระบบทะเบียน', 'claude: refusal');
+    if (message.stop_reason === 'max_tokens') throw new AIError(422, 'ตารางยาวเกินไป ลองอัปโหลดทีละรูป', 'claude: max_tokens');
+    const text = message.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
+    try { return JSON.parse(text); } catch { throw new AIError(502, 'AI ส่งข้อมูลกลับมาไม่ครบ ลองใหม่อีกครั้ง', 'claude: invalid JSON'); }
+  } catch (err) {
+    if (err instanceof AIError) throw err;
+    const d = `claude: ${apiMessage(err)}`;
+    if (err instanceof Anthropic.RateLimitError) throw new AIError(429, 'มีคนใช้งานเยอะ ลองใหม่อีกครั้งในอีกสักครู่', d);
+    if (err instanceof Anthropic.AuthenticationError) throw new AIError(500, 'ANTHROPIC_API_KEY ไม่ถูกต้อง ตรวจสอบใน Vercel', d, true);
+    if (err instanceof Anthropic.APIError) {
+      if (/workspace/i.test(d)) throw new AIError(500, 'API key ของ Claude ไม่ได้ผูกกับ workspace: ตั้งค่า ANTHROPIC_WORKSPACE_ID หรือสร้าง key ใหม่ภายใน workspace', d, true);
+      if (/credit balance|billing|purchase credits/i.test(d)) throw new AIError(402, 'เครดิตในบัญชี Anthropic ไม่พอ: เติมเครดิตที่ platform.claude.com → Settings → Billing', d, true);
+      throw new AIError(502, `AI ตอบกลับผิดพลาด (${err.status ?? 'network'})`, d);
+    }
+    throw new AIError(502, 'เชื่อมต่อ Claude ไม่ได้ ลองใหม่อีกครั้ง', d);
+  }
+}
+
+// ---------- try every model until one answers ----------
+const usable = (d) => d && d.is_timetable && Array.isArray(d.classes) && d.classes.length > 0;
+
+async function extract(images, env) {
+  const started = Date.now();
+  const timeLeft = () => DEADLINE_MS - (Date.now() - started);
+  const only = (env.AI_PROVIDER || '').toLowerCase();
+  const errors = [];
+  let empty = null;
+
+  if (env.GEMINI_API_KEY && only !== 'anthropic') {
+    const key = env.GEMINI_API_KEY;
+    const preferred = (env.GEMINI_MODEL || 'gemini-flash-latest').split(',').map((m) => m.trim()).filter(Boolean);
+    let listed = null;
+    const queue = [...preferred];
+    const tried = new Set();
+    let busyRetried = false;
+    while (queue.length && timeLeft() > 8000) {
+      const model = queue.shift();
+      if (tried.has(model)) continue;
+      tried.add(model);
+      try {
+        let data;
+        try {
+          data = await geminiOnce(model, images, key, true);
+        } catch (err) {
+          // A model that rejects JSON mode / system instructions may still work with plain instructions.
+          if (!(err instanceof AIError) || err.status !== 502 || !/400/.test(err.error)) throw err;
+          data = await geminiOnce(model, images, key, false);
+        }
+        if (usable(data)) return { data, model };
+        empty = empty || { data, model };
+        errors.push(new AIError(422, 'ไม่พบตารางเรียนในรูป ลองใช้รูปที่เห็นตารางชัด ๆ', `${model}: ${data?.notes || 'no classes'}`));
+      } catch (err) {
+        const e = err instanceof AIError ? err : new AIError(502, 'เชื่อมต่อ Gemini ไม่ได้ ลองใหม่อีกครั้ง', `${model}: ${err?.message || err}`);
+        console.warn('Gemini failed', e.status, e.detail);
+        errors.push(e);
+        if (e.fatal) break;
+        // Busy right now: give the first model one more chance after a short pause.
+        if (e.status === 503 && !busyRetried && model === preferred[0]) { busyRetried = true; await sleep(2000); tried.delete(model); queue.push(model); }
+      }
+      if (!listed) {
+        listed = await listGeminiModels(key);
+        queue.push(...listed.filter((m) => !tried.has(m)));
+      }
+    }
+  }
+
+  if (env.ANTHROPIC_API_KEY && only !== 'gemini' && timeLeft() > 20000) {
+    try {
+      const data = await extractWithClaude(images);
+      if (usable(data)) return { data, model: 'claude-opus-5-5' };
+      empty = empty || { data, model: 'claude-opus-5-5' };
+    } catch (err) {
+      console.warn('Claude failed', err.status, err.detail);
+      errors.push(err instanceof AIError ? err : new AIError(502, 'เชื่อมต่อ Claude ไม่ได้', String(err)));
+    }
+  }
+
+  if (empty && !errors.some((e) => e.status !== 422)) return empty;
+  // Report the most useful failure: "busy, try again" when any model was only busy, else a key/account problem, else the last error.
+  const pick = errors.find((e) => e.status === 503) || errors.find((e) => e.status === 429) || errors.find((e) => e.fatal) || errors[errors.length - 1];
+  if (pick) throw new AIError(pick.status, pick.error, errors.map((e) => e.detail).filter(Boolean).slice(-4).join(' | '));
+  throw new AIError(503, 'ตอนนี้ AI ทุกตัวไม่ว่าง ลองใหม่อีกครั้งในอีก 1–2 นาที');
 }
 
 function send(res, status, body) {
@@ -190,10 +281,8 @@ function send(res, status, body) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return send(res, 405, { error: 'ใช้ได้เฉพาะ POST' });
-  // AI_PROVIDER=gemini|anthropic picks one explicitly; otherwise the free Gemini key wins when both are set.
   const env = process.env;
-  const provider = env.AI_PROVIDER || (env.GEMINI_API_KEY ? 'gemini' : env.ANTHROPIC_API_KEY ? 'anthropic' : '');
-  if (!provider) {
+  if (!env.GEMINI_API_KEY && !env.ANTHROPIC_API_KEY) {
     return send(res, 503, { error: 'ยังไม่ได้ตั้งค่า GEMINI_API_KEY (ฟรี) หรือ ANTHROPIC_API_KEY ใน Vercel (Settings → Environment Variables) แล้ว Redeploy' });
   }
 
@@ -211,81 +300,12 @@ export default async function handler(req, res) {
   }
   if (total > MAX_BASE64) return send(res, 413, { error: 'รูปใหญ่เกินไป ลองอัปโหลดทีละรูป หรือครอปเฉพาะส่วนตาราง' });
 
-  const content = [
-    ...images.map((img) => ({ type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } })),
-    { type: 'text', text: `Transcribe the class timetable and exam table in ${images.length > 1 ? 'these images' : 'this image'}.` },
-  ];
-
-  const finish = (data) => {
-    if (!data.is_timetable || !Array.isArray(data.classes) || !data.classes.length) {
-      return send(res, 422, { error: 'ไม่พบตารางเรียนในรูป ลองใช้รูปที่เห็นตารางชัด ๆ', detail: data.notes || '' });
-    }
-    return send(res, 200, { data });
-  };
-
-  if (provider === 'gemini') {
-    if (!env.GEMINI_API_KEY) return send(res, 503, { error: 'AI_PROVIDER เป็น gemini แต่ยังไม่ได้ตั้งค่า GEMINI_API_KEY' });
-    try {
-      return finish(await extractWithGemini(images, env.GEMINI_API_KEY));
-    } catch (err) {
-      if (err instanceof AIError) return send(res, err.status, { error: err.error, detail: err.detail });
-      console.error(err);
-      return send(res, 502, { error: 'เชื่อมต่อ Gemini ไม่ได้ ลองใหม่อีกครั้ง' });
-    }
-  }
-  if (!env.ANTHROPIC_API_KEY) return send(res, 503, { error: 'AI_PROVIDER เป็น anthropic แต่ยังไม่ได้ตั้งค่า ANTHROPIC_API_KEY' });
-
-  // A key that is not scoped to a workspace must name one; set ANTHROPIC_WORKSPACE_ID in Vercel for that case.
-  const workspace = process.env.ANTHROPIC_WORKSPACE_ID;
-  const client = new Anthropic(workspace ? { defaultHeaders: { 'anthropic-workspace-id': workspace } } : {});
-  const request = {
-    model: 'claude-opus-5-5',
-    max_tokens: 32000,
-    system: SYSTEM,
-    output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
-    messages: [{ role: 'user', content }],
-  };
-  const withFallback = { ...request, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' };
   try {
-    let message;
-    try {
-      message = await client.beta.messages.stream(withFallback).finalMessage();
-    } catch (err) {
-      // Some accounts or orgs cannot use server-side fallbacks yet; retry the same request without them.
-      if (!(err instanceof Anthropic.BadRequestError) || !/fallback|beta/i.test(apiMessage(err))) throw err;
-      console.warn('Retrying without fallbacks:', apiMessage(err));
-      message = await client.beta.messages.stream(request).finalMessage();
-    }
-
-    if (message.stop_reason === 'refusal') {
-      return send(res, 422, { error: 'AI อ่านรูปนี้ไม่ได้ ลองใช้รูปหน้าตารางเรียนจากระบบทะเบียน' });
-    }
-    if (message.stop_reason === 'max_tokens') {
-      return send(res, 422, { error: 'ตารางยาวเกินไป ลองอัปโหลดทีละรูป' });
-    }
-    const text = message.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
-    return finish(JSON.parse(text));
+    const { data, model } = await extract(images, env);
+    if (!usable(data)) return send(res, 422, { error: 'ไม่พบตารางเรียนในรูป ลองใช้รูปที่เห็นตารางชัด ๆ', detail: data?.notes || '' });
+    return send(res, 200, { data, model });
   } catch (err) {
-    if (err instanceof Anthropic.RateLimitError) return send(res, 429, { error: 'มีคนใช้งานเยอะ ลองใหม่อีกครั้งในอีกสักครู่' });
-    if (err instanceof Anthropic.AuthenticationError) return send(res, 500, { error: 'ANTHROPIC_API_KEY ไม่ถูกต้อง ตรวจสอบใน Vercel' });
-    if (err instanceof Anthropic.APIError) {
-      const detail = apiMessage(err);
-      console.error('Claude API error', err.status, detail);
-      if (/workspace/i.test(detail)) {
-        return send(res, 500, { error: 'API key นี้ไม่ได้ผูกกับ workspace: ตั้งค่า ANTHROPIC_WORKSPACE_ID ใน Vercel หรือสร้าง key ใหม่ภายใน workspace', detail });
-      }
-      if (/credit balance|billing|purchase credits/i.test(detail)) {
-        return send(res, 402, { error: 'เครดิตในบัญชี Anthropic ไม่พอ: เติมเครดิตที่ platform.claude.com → Settings → Billing แล้วลองใหม่', detail });
-      }
-      if (/model/i.test(detail) && /not found|access|permission|available/i.test(detail)) {
-        return send(res, 502, { error: 'บัญชีนี้ยังใช้โมเดล AI ที่ตั้งไว้ไม่ได้', detail });
-      }
-      if (/image/i.test(detail)) {
-        return send(res, 400, { error: 'รูปนี้ใช้ไม่ได้ ลองแคปหน้าจอใหม่เป็น PNG หรือ JPG', detail });
-      }
-      return send(res, 502, { error: `AI ตอบกลับผิดพลาด (${err.status ?? 'network'})`, detail });
-    }
-    if (err instanceof SyntaxError) return send(res, 502, { error: 'AI ส่งข้อมูลกลับมาไม่ครบ ลองใหม่อีกครั้ง' });
+    if (err instanceof AIError) return send(res, err.status, { error: err.error, detail: err.detail });
     console.error(err);
     return send(res, 500, { error: 'เกิดข้อผิดพลาด ลองใหม่อีกครั้ง' });
   }
