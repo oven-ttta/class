@@ -256,6 +256,16 @@ details.tools summary{padding:0}
 .upr .at{font-variant-numeric:tabular-nums;color:var(--muted)}
 .upv .code{font-weight:600;color:var(--accent)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
+.pname{font-size:1.4rem;font-weight:700;line-height:1.3;overflow-wrap:anywhere}
+.sheet-head>.head-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex:none}
+.btn.edit{display:inline-flex;align-items:center;gap:6px}
+.btn.edit::before{content:"✎";font-size:1em;line-height:1}
+.btn.sm{padding:4px 10px;font-size:.85rem;min-height:32px}
+dl.info{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin:0 0 10px;font-size:.92rem}
+dl.info dt{color:var(--muted)} dl.info dd{margin:0;min-width:0;overflow-wrap:anywhere}
+dl.info dd.empty{color:var(--muted)}
+td.act{white-space:nowrap;text-align:right}
+@media (max-width:560px){dl.info{grid-template-columns:1fr;gap:0 0} dl.info dd{margin-bottom:6px}}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:.9rem;z-index:60}
 @media (max-width:560px){
   .profile{grid-template-columns:1fr}
@@ -445,28 +455,25 @@ function renderPeople(){
   bindUI(el);
   el.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{state.currentId=b.dataset.id;commit()});
   el.querySelector('#uploadPerson').onclick=openUpload;
-  el.querySelector('#addPerson').onclick=()=>{const p=person('คนใหม่',{advisor:''});state.people.push(p);state.currentId=p.id;ui.pq='';saveUI();commit();
-    setTimeout(()=>{const f=document.getElementById('f-name');f&&(f.focus(),f.select())},0)};
+  el.querySelector('#addPerson').onclick=()=>editPerson(person('',{advisor:''}),true);
 }
 function hourOpts(sel,from,to){let s='';for(let h=from;h<=to;h++)s+=`<option value="${h}"${h===sel?' selected':''}>${pad(h)}:00</option>`;return s}
 const classMatch=(p,c)=>hasQ(ui.cq,c.code,c.room,c.group,c.day,courseName(p,c.code))&&inWeek(c.dates,ui.cdate);
 function renderSheet(){
   const p=cur(),el=document.getElementById('sheet');
-  const F=(k,label,cls='')=>`<label for="f-${k}">${label}</label><input class="field ${cls}" id="f-${k}" data-k="${k}" value="${esc(p[k])}" placeholder="—">`;
+  const I=(label,v)=>`<dt>${label}</dt><dd${v?'':' class="empty"'}>${v?esc(v):'—'}</dd>`;
   const open=ui.profOpen??(innerWidth>=700);
   const shown=p.classes.filter(c=>classMatch(p,c)).length,filtering=!!(String(ui.cq).trim()||ui.cdate);
   el.innerHTML=`
     <div class="sheet-head"><div>
         <div class="eyebrow">ตารางเรียน/สอบของรายวิชาที่ลงทะเบียนไว้แล้ว</div>
-        <input class="field name" id="f-name" data-k="name" value="${esc(p.name)}" placeholder="ชื่อเจ้าของตาราง" aria-label="ชื่อเจ้าของตาราง">
+        <h2 class="pname">${esc(p.name||'(ยังไม่ได้ตั้งชื่อ)')}</h2>
         <div class="stats">${p.classes.length} วิชา · ${fmtH(hrs(p.classes))} ชม./สัปดาห์ · ปีการศึกษา ${esc(p.year)}/${esc(p.term)}</div>
       </div>
-      <button class="btn primary" id="bAddClass">+ เพิ่มวิชา</button></div>
+      <div class="head-actions"><button class="btn edit" id="bEditPerson">แก้ไขชื่อ / ข้อมูล</button><button class="btn primary" id="bAddClass">+ เพิ่มวิชา</button></div></div>
     <details class="prof" id="prof"${open?' open':''}><summary>ข้อมูลนักศึกษา</summary>
-      <div class="profile">${F('status','สถานภาพ')}${F('faculty','สำนักวิชา')}${F('program','หลักสูตร')}${F('advisor','อ. ที่ปรึกษา')}
-        <label for="f-year">ปีการศึกษา</label>
-        <div class="grp" style="display:flex;gap:6px;align-items:center"><input class="small year" id="f-year" data-k="year" value="${esc(p.year)}" aria-label="ปีการศึกษา"> / <input class="small term" id="f-term" data-k="term" value="${esc(p.term)}" aria-label="ภาคการศึกษา"></div>
-      </div></details>
+      <dl class="info">${I('สถานภาพ',p.status)}${I('สำนักวิชา',p.faculty)}${I('หลักสูตร',p.program)}${I('อ. ที่ปรึกษา',p.advisor)}${I('ปีการศึกษา',[p.year,p.term].filter(Boolean).join(' / '))}</dl>
+      <button class="btn edit sm" id="bEditPerson2">แก้ไขข้อมูลนักศึกษา</button></details>
     <div class="filters">
       <input type="search" class="q" id="q-class" data-ui="cq" value="${esc(ui.cq)}" placeholder="ค้นหารหัสวิชา ห้อง หรือชื่อวิชา" aria-label="ค้นหาวิชา">
       <label class="qlabel">เรียนในสัปดาห์ของ <input type="date" class="q" id="d-class" data-ui="cdate" value="${esc(ui.cdate)}"></label>
@@ -485,7 +492,7 @@ function renderSheet(){
       <span class="note">* รหัสวิชา, กลุ่ม, ห้องเรียนและอาคาร, ช่วงวันที่ (เวลา)</span>
     </div>`;
   bindUI(el);
-  el.querySelectorAll('[data-k]').forEach(i=>i.oninput=()=>{p[i.dataset.k]=i.value;save();if(i.dataset.k==='name')renderPeople()});
+  el.querySelector('#bEditPerson').onclick=el.querySelector('#bEditPerson2').onclick=()=>editPerson(p);
   el.querySelector('#prof').addEventListener('toggle',e=>{ui.profOpen=e.target.open;saveUI()});
   el.querySelector('#d-week').onclick=()=>setUI('cdate',ui.cdate?'':isoToday());
   const sh=el.querySelector('#f-sh'),eh=el.querySelector('#f-eh');
@@ -562,9 +569,9 @@ function renderExams(){
       <select class="q" id="so-exam" data-ui="esort" aria-label="เรียงตาราง">${opt('esort','code','เรียงตามรหัสวิชา')}${opt('esort','name','เรียงตามชื่อวิชา')}${opt('esort','mid','วันสอบกลางภาคก่อน → หลัง')}${opt('esort','final','วันสอบประจำภาคก่อน → หลัง')}</select>
       ${list.length!==p.exams.length?`<span class="count">แสดง ${list.length} จาก ${p.exams.length} วิชา</span>`:''}
     </div>
-    <div class="scroll"><table class="cards"><thead><tr><th>รหัสวิชา</th><th>ชื่อรายวิชา</th><th>กลุ่ม</th><th style="text-align:center">สอบกลางภาค</th><th style="text-align:center">สอบประจำภาค</th></tr></thead>
-    <tbody>${list.map(e=>`<tr class="er" data-eid="${e.id}" tabindex="0"><td class="code" data-label="รหัสวิชา">${esc(e.code)}</td><td class="wide" data-label="ชื่อรายวิชา"><span>${esc(e.nameEn)}</span><span class="th">${esc(e.nameTh)}</span></td><td data-label="กลุ่ม">${esc(e.group)}</td><td class="when" data-label="สอบกลางภาค">${esc(e.mid)}</td><td class="when" data-label="สอบประจำภาค">${esc(e.final)}</td></tr>`).join('')||
-      `<tr><td colspan="5" class="note">${p.exams.length?'ไม่พบวิชาที่ค้นหา':'ยังไม่มีวิชาในตารางสอบ กด “เพิ่มวิชาในตารางสอบ” เพื่อเริ่ม'}</td></tr>`}</tbody></table></div>
+    <div class="scroll"><table class="cards"><thead><tr><th>รหัสวิชา</th><th>ชื่อรายวิชา</th><th>กลุ่ม</th><th style="text-align:center">สอบกลางภาค</th><th style="text-align:center">สอบประจำภาค</th><th></th></tr></thead>
+    <tbody>${list.map(e=>`<tr class="er" data-eid="${e.id}" tabindex="0"><td class="code" data-label="รหัสวิชา">${esc(e.code)}</td><td class="wide" data-label="ชื่อรายวิชา"><span>${esc(e.nameEn)}</span><span class="th">${esc(e.nameTh)}</span></td><td data-label="กลุ่ม">${esc(e.group)}</td><td class="when" data-label="สอบกลางภาค">${esc(e.mid)}</td><td class="when" data-label="สอบประจำภาค">${esc(e.final)}</td><td class="act"><button class="btn edit sm" tabindex="-1">แก้ไข</button></td></tr>`).join('')||
+      `<tr><td colspan="6" class="note">${p.exams.length?'ไม่พบวิชาที่ค้นหา':'ยังไม่มีวิชาในตารางสอบ กด “เพิ่มวิชาในตารางสอบ” เพื่อเริ่ม'}</td></tr>`}</tbody></table></div>
     <div class="bar"><span class="legend">หมายเหตุ C = Lecture L = Lab P = โครงงาน R = ประชุม S = Self Study T = ติว</span><span class="spacer"></span><button class="btn primary" id="bAddExam">+ เพิ่มวิชาในตารางสอบ</button></div>`;
   bindUI(el);
   el.querySelectorAll('tr.er').forEach(r=>{const o=()=>openExam(p.exams.find(e=>e.id===r.dataset.eid));r.onclick=o;r.onkeydown=ev=>{if(ev.key==='Enter')o()}});
@@ -580,6 +587,30 @@ function modal(html,bind){
   ov.onclick=e=>{if(e.target===ov)close()};
   bind(ov,close);
   const f=ov.querySelector('input,select,textarea');f&&f.focus();
+}
+/* fields: [{k,label,type:'text'|'number'|'select'|'textarea',value,options:[[v,l]],full,placeholder,required}] */
+function openForm({title,fields,onSave,onDelete,saveLabel='บันทึก'}){
+  modal(`<h2>${esc(title)}</h2><form class="form" id="gf">${fields.map(f=>{
+      const id='g-'+f.k,lab=`${esc(f.label)}`,cls=f.full?' class="full"':'';
+      if(f.type==='select')return `<label${cls}>${lab}<select id="${id}">${f.options.map(([v,l])=>`<option value="${esc(v)}"${String(v)===String(f.value??'')?' selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
+      if(f.type==='textarea')return `<label${cls}>${lab}<textarea id="${id}" rows="3">${esc(f.value)}</textarea></label>`;
+      return `<label${cls}>${lab}<input id="${id}" ${f.type==='number'?'inputmode="decimal"':''} value="${esc(f.value)}" placeholder="${esc(f.placeholder||'')}"${f.required?' required':''}></label>`}).join('')}
+    <div class="actions full">${onDelete?'<button type="button" class="btn danger" id="g-del">ลบ</button><span class="spacer"></span>':''}
+      <button type="button" class="btn" id="g-cancel">ยกเลิก</button><button class="btn primary">${esc(saveLabel)}</button></div></form>`,(ov,close)=>{
+    ov.querySelector('#g-cancel').onclick=close;
+    const del=ov.querySelector('#g-del');del&&armDelete(del,()=>{close();onDelete()});
+    ov.querySelector('#gf').onsubmit=e=>{e.preventDefault();const v={};
+      fields.forEach(f=>{let x=ov.querySelector('#g-'+f.k).value;if(f.type!=='textarea')x=x.trim();if(f.type==='number')x=x===''?'':(+x||0);v[f.k]=x});
+      close();onSave(v)};
+  });
+}
+function editPerson(p,isNew){
+  openForm({title:isNew?'เพิ่มคนใหม่':'แก้ไขข้อมูลเจ้าของตาราง',saveLabel:isNew?'เพิ่ม':'บันทึก',fields:[
+    {k:'name',label:'ชื่อเจ้าของตาราง',value:isNew?'':p.name,full:true,required:true,placeholder:'เช่น อัจฉรียา พุทธโคตร'},
+    {k:'status',label:'สถานภาพ',value:p.status},{k:'advisor',label:'อ. ที่ปรึกษา',value:p.advisor},
+    {k:'faculty',label:'สำนักวิชา',value:p.faculty,full:true},{k:'program',label:'หลักสูตร',value:p.program,full:true},
+    {k:'year',label:'ปีการศึกษา',value:p.year},{k:'term',label:'ภาคการศึกษา',value:p.term}],
+    onSave:v=>{Object.assign(p,v);if(isNew){state.people.push(p);state.currentId=p.id;ui.pq='';saveUI()}commit();toast(isNew?'เพิ่ม '+p.name+' แล้ว':'บันทึกแล้ว')}});
 }
 function armDelete(btn,fn){btn.onclick=()=>{if(btn.classList.contains('armed'))fn();else{btn.classList.add('armed');btn.textContent='กดอีกครั้งเพื่อยืนยันลบ';setTimeout(()=>{btn.classList.remove('armed');btn.textContent='ลบ'},3000)}}}
 function openClass(c,preset){
@@ -712,10 +743,10 @@ function renderTeach(){
   el.innerHTML=`
     <div class="sheet-head"><div>
         <div class="eyebrow">ตารางสอนเด็ก</div>
-        <input class="field name" id="t-title" value="${esc(T.title)}" placeholder="ชื่อตารางสอน" aria-label="ชื่อตารางสอน">
+        <h2 class="pname">${esc(T.title||'(ยังไม่ได้ตั้งชื่อ)')}</h2>
         <div class="stats">${T.slots.length} คาบ · ${fmtH(hrs(T.slots))} ชม./สัปดาห์ · ครู ${T.teachers.length} คน</div>
       </div>
-      <button class="btn primary" id="t-add">+ เพิ่มคาบสอน</button></div>
+      <div class="head-actions"><button class="btn edit" id="t-edit">แก้ไขชื่อตาราง</button><button class="btn primary" id="t-add">+ เพิ่มคาบสอน</button></div></div>
     ${!T.slots.length?`<div class="status"><b>ยังไม่มีคาบสอน</b><span class="note">แตะช่องว่างในตาราง หรือกด “+ เพิ่มคาบสอน” เลือกวิชาแล้วระบบจะใส่ครูผู้สอนให้ และเช็คว่าชนกับเวลาเรียนของครูไหม</span></div>`:
       all.length?`<div class="status bad"><b>พบเวลาชน ${all.length} คาบ</b><ul>${all.map(x=>`<li data-sid="${x.s.id}">${esc(x.s.day)} ${esc(x.s.start)}-${esc(x.s.end)} ${esc(subLabel(sub(x.s.subjectId)))}: ${x.c.map(esc).join(' · ')}</li>`).join('')}</ul></div>`:
       `<div class="status ok"><b>ไม่มีคาบไหนชนกับเวลาเรียน</b><span class="note">เช็คจาก ${linked.length} ครูที่เชื่อมตารางเรียนไว้</span></div>`}
@@ -734,7 +765,7 @@ function renderTeach(){
       <span class="spacer"></span><span class="note">กรอบแดง = คาบที่ชน · ลายทาง = เวลาที่ครูติดเรียน</span>
     </div>`;
   bindUI(el);
-  el.querySelector('#t-title').oninput=e=>{T.title=e.target.value;save()};
+  el.querySelector('#t-edit').onclick=()=>openForm({title:'แก้ไขชื่อตารางสอน',fields:[{k:'title',label:'ชื่อตารางสอน',value:T.title,full:true,placeholder:'เช่น ม.1 ภาคเรียนที่ 2'}],onSave:v=>{T.title=v.title;commit();toast('บันทึกแล้ว')}});
   const sh=el.querySelector('#t-sh'),eh=el.querySelector('#t-eh');
   sh.onchange=()=>{T.startHour=+sh.value;if(T.endHour<=T.startHour)T.endHour=T.startHour+1;commit()};
   eh.onchange=()=>{T.endHour=+eh.value;if(T.endHour<=T.startHour)T.startHour=T.endHour-1;commit()};
@@ -767,13 +798,13 @@ function renderSubjects(){
     missing:(a,b)=>(perWeek(b)-placed(b))-(perWeek(a)-placed(a))||order.get(a.id)-order.get(b.id)}[ui.ssort]||((a,b)=>order.get(a.id)-order.get(b.id));
   const visible=T.subjects.filter(s=>(!ui.stype||(s.type||'อื่น ๆ')===ui.stype)&&keep(s)).length;
   const row=s=>{const need=perWeek(s),got=placed(s);const cls=need&&got===need?'done':got>need?'over':'';
-    return `<tr data-sub="${s.id}"><td data-label="รหัสวิชา"><input class="tin cd" data-f="code" value="${esc(s.code)}" aria-label="รหัสวิชา"></td>
-    <td class="wide" data-label="ชื่อวิชา"><input class="tin" data-f="name" value="${esc(s.name)}" aria-label="ชื่อวิชา" style="min-width:10em"></td>
-    <td data-label="หน่วยกิต"><input class="tin num" data-f="credits" value="${esc(s.credits)}" inputmode="decimal" aria-label="หน่วยกิต"></td>
-    <td data-label="ชั่วโมง"><input class="tin num" data-f="hours" value="${esc(s.hours)}" inputmode="numeric" aria-label="ชั่วโมง"></td>
+    return `<tr data-sub="${s.id}" class="er" tabindex="0"><td class="code" data-label="รหัสวิชา">${esc(s.code)||'<span class="note">—</span>'}</td>
+    <td class="wide" data-label="ชื่อวิชา">${esc(s.name)}</td>
+    <td data-label="หน่วยกิต">${esc(s.credits)}</td>
+    <td data-label="ชั่วโมง">${esc(s.hours)}</td>
     <td class="mid" data-label="จัดแล้ว"><span class="pill ${cls}">${fmtH(got)}/${need} คาบ</span></td>
-    <td class="span2" data-label="ครูผู้สอน"><select class="tin" data-f="teacherId" aria-label="ครูผู้สอน">${teacherOpts(s.teacherId)}</select></td>
-    <td class="mid act"><button class="ib" data-delsub="${s.id}" aria-label="ลบวิชา">✕</button></td></tr>`};
+    <td class="span2" data-label="ครูผู้สอน">${esc(tname(s))||'<span class="note">— ไม่ระบุ —</span>'}</td>
+    <td class="mid act"><button class="btn edit sm" tabindex="-1">แก้ไข</button></td></tr>`};
   el.innerHTML=`<div><div class="exam-h">รายวิชา ${esc(T.title)}</div></div>
     <div class="filters">
       <input type="search" class="q" id="q-sub" data-ui="sq" value="${esc(ui.sq)}" placeholder="ค้นหารหัส ชื่อวิชา หรือครู" aria-label="ค้นหารายวิชา">
@@ -791,14 +822,21 @@ function renderSubjects(){
       <select class="small" id="ns-type" aria-label="ประเภทวิชาใหม่"><option>พื้นฐาน</option><option>เพิ่มเติม</option></select>
       <button class="btn primary" id="ns-add">+ เพิ่มรายวิชา</button></div>`;
   bindUI(el);
-  el.querySelectorAll('tr[data-sub]').forEach(tr=>{const s=sub(tr.dataset.sub);
-    tr.querySelectorAll('[data-f]').forEach(i=>{const f=i.dataset.f;
-      i.oninput=()=>{s[f]=(f==='credits'||f==='hours')?(i.value===''?'':+i.value||0):i.value;save()};
-      i.onchange=()=>commit()})});
-  el.querySelectorAll('[data-delsub]').forEach(b=>{b.onclick=()=>{if(b.classList.contains('armed')){const id=b.dataset.delsub;T.subjects=T.subjects.filter(s=>s.id!==id);T.slots=T.slots.filter(x=>x.subjectId!==id);commit();toast('ลบวิชาแล้ว')}else{b.classList.add('armed');b.textContent='ลบ?';b.style.width='auto';b.style.color='var(--danger)';setTimeout(()=>{b.classList.remove('armed');b.textContent='✕';b.style.width='';b.style.color=''},3000)}}});
-  el.querySelector('#ns-add').onclick=()=>{const type=el.querySelector('#ns-type').value;T.subjects.push({id:uid(),type,code:'',name:'วิชาใหม่',credits:0.5,hours:20,teacherId:''});
-    Object.assign(ui,{sq:'',spending:false,stype:''});saveUI();commit();
-    const last=[...document.querySelectorAll('#tSubjects [data-f="name"]')].find(i=>i.value==='วิชาใหม่');last&&(last.focus(),last.select())};
+  el.querySelectorAll('tr[data-sub]').forEach(tr=>{const o=()=>editSubject(sub(tr.dataset.sub));tr.onclick=o;tr.onkeydown=e=>{if(e.key==='Enter')o()}});
+  el.querySelector('#ns-add').onclick=()=>editSubject(null,el.querySelector('#ns-type').value);
+}
+function editSubject(s,type){
+  const T=TT(),isNew=!s,d=s||{type:type||'พื้นฐาน',code:'',name:'',credits:0.5,hours:20,teacherId:''};
+  openForm({title:isNew?'เพิ่มรายวิชา':'แก้ไขรายวิชา',saveLabel:isNew?'เพิ่ม':'บันทึก',fields:[
+    {k:'code',label:'รหัสวิชา',value:d.code,placeholder:'เช่น ท21102'},
+    {k:'type',label:'ประเภท',type:'select',value:d.type,options:[...new Set(['พื้นฐาน','เพิ่มเติม',d.type])].map(x=>[x,'รายวิชา'+x])},
+    {k:'name',label:'ชื่อวิชา',value:d.name,full:true,required:true,placeholder:'เช่น ภาษาไทย 2'},
+    {k:'credits',label:'หน่วยกิต (น.ก.)',type:'number',value:d.credits},
+    {k:'hours',label:'ชั่วโมงต่อภาค',type:'number',value:d.hours},
+    {k:'teacherId',label:'ครูผู้สอน',type:'select',full:true,value:d.teacherId,options:[['','— ไม่ระบุ —'],...T.teachers.map(t=>[t.id,t.name])]}],
+    onSave:v=>{if(isNew)T.subjects.push({id:uid(),...v});else Object.assign(s,v);
+      if(isNew){Object.assign(ui,{sq:'',spending:false,stype:''});saveUI()}commit();toast(isNew?'เพิ่มวิชาแล้ว':'บันทึกแล้ว')},
+    onDelete:isNew?null:()=>{T.subjects=T.subjects.filter(x=>x.id!==s.id);T.slots=T.slots.filter(x=>x.subjectId!==s.id);commit();toast('ลบวิชาแล้ว')}});
 }
 function renderTeachers(){
   const T=TT(),el=document.getElementById('tTeachers');
@@ -815,22 +853,30 @@ function renderTeachers(){
       ${list.length!==info.length?`<span class="count">แสดง ${list.length} จาก ${info.length} คน</span>`:''}
     </div>
     <div class="scroll"><table class="cards"><thead><tr><th>ชื่อครู</th><th>สอนวิชา</th><th>ตารางเรียนของคนนี้</th><th>คาบ/สัปดาห์</th><th>ชน</th><th></th></tr></thead><tbody>
-    ${list.map(({t,subs,h,cl})=>`<tr data-tid="${t.id}"><td class="mid wide" data-label="ชื่อครู"><span style="display:flex;align-items:center"><span class="dot" style="background:var(--b-${esc(t.color)})"></span><input class="tin" data-tf="name" value="${esc(t.name)}" aria-label="ชื่อครู" style="width:9em"></span></td>
+    ${list.map(({t,subs,h,cl})=>`<tr data-tid="${t.id}" class="er" tabindex="0"><td class="mid wide" data-label="ชื่อครู"><span style="display:flex;align-items:center;font-weight:600"><span class="dot" style="background:var(--b-${esc(t.color)})"></span>${esc(t.name)}</span></td>
       <td class="mid wide" data-label="สอนวิชา">${subs.map(s=>esc(s.name)).join(', ')||'<span class="note">—</span>'}</td>
-      <td class="wide" data-label="ตารางเรียนของคนนี้"><select class="tin" data-tf="personId" aria-label="ตารางเรียนของ ${esc(t.name)}"><option value="">— ไม่ได้เชื่อม —</option>${state.people.map(p=>`<option value="${p.id}"${p.id===t.personId?' selected':''}>${esc(p.name)}</option>`).join('')}<option value="__new">+ สร้างตารางเรียนใหม่ชื่อ “${esc(t.name)}”</option></select></td>
+      <td class="mid wide" data-label="ตารางเรียนของคนนี้">${esc(pname(t))||'<span class="note">— ไม่ได้เชื่อม —</span>'}</td>
       <td class="mid" data-label="คาบ/สัปดาห์">${fmtH(h)}</td>
       <td class="mid" data-label="คาบที่ชน">${cl?`<span class="pill over">${cl}</span>`:'<span class="note">0</span>'}</td>
-      <td class="mid act"><button class="ib" data-deltch="${t.id}" aria-label="ลบครู">✕</button></td></tr>`).join('')||'<tr class="sum"><td colspan="6" class="note">ไม่พบครูที่ค้นหา</td></tr>'}
+      <td class="mid act"><button class="btn edit sm" tabindex="-1">แก้ไข</button></td></tr>`).join('')||'<tr class="sum"><td colspan="6" class="note">ไม่พบครูที่ค้นหา</td></tr>'}
     </tbody></table></div>`;
   bindUI(el);
-  el.querySelectorAll('tr[data-tid]').forEach(tr=>{const t=tch(tr.dataset.tid);
-    const nm=tr.querySelector('[data-tf=name]');nm.oninput=()=>{t.name=nm.value;save()};nm.onchange=()=>commit();
-    tr.querySelector('[data-tf=personId]').onchange=e=>{let v=e.target.value;
-      if(v==='__new'){const p=person(t.name,{advisor:''});state.people.push(p);v=p.id;toast('สร้างตารางเรียนของ '+t.name+' แล้ว ไปกรอกวิชาที่แท็บตารางเรียน')}
-      t.personId=v;commit()}});
-  el.querySelectorAll('[data-deltch]').forEach(b=>{b.onclick=()=>{if(b.classList.contains('armed')){const id=b.dataset.deltch;T.teachers=T.teachers.filter(t=>t.id!==id);T.subjects.forEach(s=>{if(s.teacherId===id)s.teacherId=''});T.slots.forEach(s=>{if(s.teacherId===id)s.teacherId=''});if(ui.tteacher===id){ui.tteacher='';saveUI()}commit()}else{b.classList.add('armed');b.textContent='ลบ?';b.style.width='auto';b.style.color='var(--danger)';setTimeout(()=>{b.classList.remove('armed');b.textContent='✕';b.style.width='';b.style.color=''},3000)}}});
-  el.querySelector('#nt-add').onclick=()=>{const used=T.teachers.map(t=>t.color);const c=(COLORS.find(([k])=>!used.includes(k))||COLORS[T.teachers.length%COLORS.length])[0];
-    T.teachers.push({id:uid(),name:'ครูใหม่',color:c,personId:''});ui.teq='';saveUI();commit();const ins=[...document.querySelectorAll('#tTeachers [data-tf=name]')].pop();ins&&(ins.focus(),ins.select())};
+  el.querySelectorAll('tr[data-tid]').forEach(tr=>{const o=()=>editTeacher(tch(tr.dataset.tid));tr.onclick=o;tr.onkeydown=e=>{if(e.key==='Enter')o()}});
+  el.querySelector('#nt-add').onclick=()=>editTeacher(null);
+}
+function editTeacher(t){
+  const T=TT(),isNew=!t,used=T.teachers.map(x=>x.color);
+  const d=t||{name:'',color:(COLORS.find(([k])=>!used.includes(k))||COLORS[T.teachers.length%COLORS.length])[0],personId:''};
+  openForm({title:isNew?'เพิ่มครู':'แก้ไขข้อมูลครู',saveLabel:isNew?'เพิ่ม':'บันทึก',fields:[
+    {k:'name',label:'ชื่อครู',value:d.name,full:true,required:true,placeholder:'เช่น พี่เหมย'},
+    {k:'color',label:'สีในตาราง',type:'select',value:d.color,options:COLORS.map(([k,n])=>[k,n])},
+    {k:'personId',label:'ตารางเรียนของคนนี้ (ใช้เช็คเวลาชน)',type:'select',value:d.personId,
+      options:[['','— ไม่ได้เชื่อม —'],...state.people.map(p=>[p.id,p.name]),['__new','+ สร้างตารางเรียนใหม่ชื่อเดียวกับครู']]}],
+    onSave:v=>{
+      if(v.personId==='__new'){const p=person(v.name,{advisor:''});state.people.push(p);v.personId=p.id;toast('สร้างตารางเรียนของ '+v.name+' แล้ว ไปกรอกวิชาที่แท็บตารางเรียน')}
+      else toast(isNew?'เพิ่มครูแล้ว':'บันทึกแล้ว');
+      if(isNew){T.teachers.push({id:uid(),...v});ui.teq='';saveUI()}else Object.assign(t,v);commit()},
+    onDelete:isNew?null:()=>{const id=t.id;T.teachers=T.teachers.filter(x=>x.id!==id);T.subjects.forEach(x=>{if(x.teacherId===id)x.teacherId=''});T.slots.forEach(x=>{if(x.teacherId===id)x.teacherId=''});if(ui.tteacher===id){ui.tteacher='';saveUI()}commit();toast('ลบครูแล้ว')}});
 }
 function openSlot(s,preset){
   const T=TT(),isNew=!s,d=s||Object.assign({subjectId:'',teacherId:'',room:''},preset);
