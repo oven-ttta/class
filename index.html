@@ -918,6 +918,191 @@ function openSlot(s,preset){
   });
 }
 
+/* ---------- free OCR in the browser (Tesseract.js): no key, no quota, the picture never leaves the device ---------- */
+const TESS_URL='https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js';
+const tessWorkers={};
+async function tessWorker(langs,psm){
+  if(!window.Tesseract)await loadScript(TESS_URL);
+  const k=langs.join('+')+':'+psm;
+  if(!tessWorkers[k])tessWorkers[k]=(async()=>{const w=await Tesseract.createWorker(langs,1);await w.setParameters({tessedit_pageseg_mode:String(psm),preserve_interword_spaces:'1'});return w})();
+  return tessWorkers[k];
+}
+function loadImg(src){return new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(new Error('เปิดรูปไม่ได้'));i.src=src})}
+async function pixels(src){
+  const img=await loadImg(src),k=Math.min(2400/Math.max(img.naturalWidth,img.naturalHeight),Math.max(1,1600/img.naturalWidth)); // enlarge small screenshots a little
+  const c=document.createElement('canvas');c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);
+  const x=c.getContext('2d',{willReadFrequently:true});x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);
+  return {c,W:c.width,H:c.height,a:x.getImageData(0,0,c.width,c.height).data};
+}
+const pAt=(D,x,y)=>{const i=(y*D.W+x)*4;return [D.a[i],D.a[i+1],D.a[i+2]]};
+const pLum=p=>0.3*p[0]+0.59*p[1]+0.11*p[2],pSat=p=>Math.max(...p)-Math.min(...p);
+const isBg=p=>{const l=pLum(p),s=pSat(p);return (s<20&&l>205)||(l>222&&s<30)}; // white separators (also blurred ones) and empty light-grey cells
+const isDay=p=>{const l=pLum(p),s=pSat(p);return (s<32&&l>105&&l<182)||(s>55&&l<155&&p[0]>p[1]+35)}; // grey day label, or the dark-red weekend label
+const isHead=p=>pLum(p)<105&&pSat(p)<35;
+function crop(D,r,{scale=2,invert=false}={}){
+  const c=document.createElement('canvas');c.width=Math.max(1,Math.round((r.x1-r.x0)*scale));c.height=Math.max(1,Math.round((r.y1-r.y0)*scale));
+  const x=c.getContext('2d');x.filter=`grayscale(1) contrast(1.7)${invert?' invert(1)':''}`;x.imageSmoothingQuality='high';
+  x.drawImage(D.c,r.x0,r.y0,r.x1-r.x0,r.y1-r.y0,0,0,c.width,c.height);return c;
+}
+// Locate the SUT timetable grid: day-label column, its rows (one per day), the header band, and every coloured class cell.
+function findGrid(D){
+  const {W,H}=D,cols=[];
+  for(let x=0;x<W*0.35;x++){let n=0;for(let y=0;y<H;y+=2)if(isDay(pAt(D,x,y)))n++;cols.push(n)}
+  const best=Math.max(0,...cols);if(best<20)return null;
+  let x0=cols.indexOf(best),x1=x0;while(x0>0&&cols[x0-1]>best*0.6)x0--;while(x1<cols.length-1&&cols[x1+1]>best*0.6)x1++;
+  if(x1-x0<20)return null;
+  const probe=[x0+3,x1-3],rows=[];let start=-1;
+  const ls=[];for(let y=0;y<H;y++)for(const x of probe){const p=pAt(D,x,y);if(isDay(p)&&pSat(p)<32)ls.push(pLum(p))}
+  ls.sort((a,b)=>a-b);const Lm=ls.length?ls[ls.length>>1]:150;
+  const onDay=p=>isDay(p)&&(pSat(p)>=32||pLum(p)<Lm+12);      // a separator line is brighter than the label itself
+  for(let y=0;y<=H;y++){const on=y<H&&probe.some(x=>onDay(pAt(D,x,y)));if(on&&start<0)start=y;if(!on&&start>=0){if(y-start>18)rows.push({y0:start,y1:y});start=-1}}
+  if(!rows.length)return null;
+  const cx=Math.round((x0+x1)/2);let hy1=rows[0].y0-1;while(hy1>0&&!isHead(pAt(D,cx,hy1)))hy1--;let hy0=hy1;while(hy0>0&&isHead(pAt(D,cx,hy0-1)))hy0--;
+  const header=hy1-hy0>8?{y0:hy0,y1:hy1+1}:null;
+  const cells=[];
+  rows.forEach((row,ri)=>{
+    const open=[];
+    for(let y=row.y0+1;y<row.y1-1;y+=2){
+      let s=-1;
+      for(let x=x1+2;x<=W;x++){const bg=x===W||isBg(pAt(D,x,y));if(!bg&&s<0)s=x;if(bg&&s>=0){if(x-s>=40){const hue=segHue(D,s,x,y);const r=open.find(r=>Math.abs(r.x0-s)<=5&&Math.abs(r.x1-x)<=5&&y-r.y1<=3&&r.hue===hue);if(r){r.y1=y+1}else open.push({x0:s,x1:x,y0:y,y1:y+1,row:ri,hue})}s=-1}}
+    }
+    open.filter(r=>r.y1-r.y0>=16).forEach(r=>cells.push(r));
+  });
+  return {dayCol:{x0,x1},rows,header,cells,bottom:rows[rows.length-1].y1};
+}
+// 'r' for red/pink cells, 'b' for blue/lavender ones (sampled away from text)
+function segHue(D,x0,x1,y){let R=0,B=0,n=0;for(let x=x0+2;x<x1-2;x+=4){const p=pAt(D,x,y);if(pLum(p)>150){R+=p[0];B+=p[2];n++}}return n&&R>B+n*20?'r':'b'}
+function splitX(D,r){let best=0,bx=0;for(let x=Math.round(r.x0+(r.x1-r.x0)*0.2);x<r.x0+(r.x1-r.x0)*0.8;x++){let L=0,n=0;for(let y=r.y0+2;y<r.y1-2;y+=2){L+=pLum(pAt(D,x,y));n++}L/=n;if(L>best){best=L;bx=x}}return bx||null}
+function cellColor(D,r){let R=0,B=0,n=0;for(let y=r.y0+2;y<r.y1-2;y+=3)for(let x=r.x0+2;x<r.x1-2;x+=5){const p=pAt(D,x,y);if(pLum(p)>150){R+=p[0];B+=p[2];n++}}return n&&R/n>B/n+20?'rose':'blue'}
+const fixL=s=>s.toUpperCase().replace(/0/g,'O').replace(/[1|]/g,'I').replace(/5/g,'S').replace(/8/g,'B');
+const fixD=s=>s.replace(/[Oo]/g,'0').replace(/[IilL|]/g,'1').replace(/[Ss]/g,'5').replace(/B/g,'8');
+const CELL_RE=/\b(?!LAB)([A-Za-z][A-Za-z0-9|]{2})\s?([0-9OoIilL|]{2,3})\s*([0-9OoIilL|]{4})(?!\s*[\/\d])\s*[,.]?\s*([0-9OoIilL|]{1,3})?/;
+function parseCell(text){
+  const flat=text.replace(/\s+/g,' ');
+  const m=flat.match(CELL_RE);
+  if(!m)return null;
+  const code=fixL(m[1])+fixD(m[2]).slice(-2)+' '+fixD(m[3]);
+  const t=flat.match(/(\d{1,2})\s*[:.]\s*(\d{2})\s*[-–]\s*(\d{1,2})\s*[:.]\s*(\d{2})/)||flat.match(/\(\s*(\d{1,2})\s*[:.\-]?\s*(\d{2})\s*[-–]\s*(\d{1,2})\s*[:.\-]?\s*(\d{2})\s*\d?\s*\)/);
+  const d=flat.match(/(\d{1,2}\s*\/\s*\d{1,2}\s*\/\s*\d{4})\s*[-–]\s*(\d{1,2}\s*\/\s*\d{1,2}\s*\/\s*\d{4})/);
+  const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const ci=lines.findIndex(l=>l.replace(/\s/g,'').includes(m[3].replace(/\s/g,'')));
+  const room=(lines.slice(ci+1).find(l=>!/\d{1,2}\s*\/\s*\d|\d\s*[:.]\s*\d{2}/.test(l))||'').replace(/[^A-Za-z0-9\- ]/g,'').trim();
+  return {code,group:m[4]?fixD(m[4]):'',room,dates:d?(d[1]+'-'+d[2]).replace(/\s/g,''):'',start:t?pad(+t[1])+':'+t[2]:'',end:t?pad(+t[3])+':'+t[4]:''};
+}
+// When a cell's "(09:00-12:00)" can't be read, work the time out from which hour columns the cell covers.
+async function headerColumns(D,G){
+  if(!G.header)return null;
+  const y=Math.round((G.header.y0+G.header.y1)/2),segs=[];let s=-1;
+  for(let x=G.dayCol.x1+1;x<=D.W;x++){const on=x<D.W&&isHead(pAt(D,x,y));if(on&&s<0)s=x;if(!on&&s>=0){if(x-s>12)segs.push([s,x]);s=-1}}
+  if(!segs.length)return null;
+  const w=await tessWorker(['eng'],7);
+  const out=[];for(const [a,b] of segs){const {data}=await w.recognize(crop(D,{x0:a,x1:b,y0:G.header.y0,y1:G.header.y1},{scale:3,invert:true}));const m=data.text.match(/(\d{1,2})\s*[:.]\s*\d{2}/);out.push({x0:a,x1:b,h:m?+m[1]:null})}
+  for(let i=0;i<out.length;i++)if(out[i].h==null){const p=out.slice(0,i).reverse().find(o=>o.h!=null);if(p)out[i].h=p.h+(i-out.indexOf(p))}
+  return out.every(o=>o.h!=null)?out:null;
+}
+const DAY_KEYS=[['จันทร์','จัน'],['อังคาร','อังค','องคาร'],['พุธ'],['พฤหัสบดี','พฤหัส','พฤ'],['ศุกร์','ศุก'],['เสาร์','เสา'],['อาทิตย์','อาทิ']];
+async function readDays(D,G){
+  const w=await tessWorker(['tha'],7),found=[];
+  for(const r of G.rows){const {data}=await w.recognize(crop(D,{x0:G.dayCol.x0,x1:G.dayCol.x1,y0:r.y0,y1:r.y1},{scale:3,invert:true}));
+    const t=data.text.replace(/\s/g,'');found.push(DAY_KEYS.findIndex(ks=>ks.some(k=>t.includes(k))))}
+  const offs=found.map((d,i)=>d>=0?d-i:null).filter(v=>v!=null);
+  const off=offs.length?offs.sort((a,b)=>offs.filter(v=>v===b).length-offs.filter(v=>v===a).length)[0]:0;
+  return G.rows.map((_,i)=>ALL_DAYS[Math.min(6,Math.max(0,i+off))]);
+}
+const TH_MK=TH_M.map(m=>m.replace(/\./g,''));
+function thaiMonth(tok){const t=tok.replace(/[.\s]/g,'');let best=-1,score=0;
+  TH_MK.forEach((m,i)=>{let s=0;for(let j=0;j<Math.min(m.length,t.length);j++)if(m[j]===t[j])s+=2;if(m[m.length-1]===t[t.length-1])s++;if(m.length===t.length)s++;if(s>score){score=s;best=i}});
+  return score>=3?TH_M[best]:''}
+function examWhen(text){
+  const t=text.replace(/\s+/g,' ');
+  const tm=t.match(/(\d{1,2})\s*[:.]\s*(\d{2})\s*[-–]\s*(\d{1,2})\s*[:.]\s*(\d{2})/);
+  const dm=t.match(/(\d{1,2})\s*([ก-๙]{1,3}\s*\.?\s*[ก-๙]{1,3}\.?)\s*(25\d\d)/);
+  const mon=dm?thaiMonth(dm[2]):'';
+  const date=dm&&mon?`(C) ${+dm[1]} ${mon} ${dm[3]}`:'';
+  const time=tm?`เวลา ${pad(+tm[1])}:${tm[2]}-${pad(+tm[3])}:${tm[4]}`:'';
+  return [date,time].filter(Boolean).join('\n')||'-';
+}
+function ocrLines(data,ox,oy,k){const out=[];(data.blocks||[]).forEach(b=>b.paragraphs.forEach(p=>p.lines.forEach(l=>{const t=l.text.trim();if(t)out.push({t,x0:ox+l.bbox.x0/k,x1:ox+l.bbox.x1/k,y0:oy+l.bbox.y0/k,y1:oy+l.bbox.y1/k,cy:oy+(l.bbox.y0+l.bbox.y1)/2/k})})));return out}
+const EXAM_RE=/([A-Z0-9|l]{3})\s?([0-9OIl|]{2})\s*([0-9OIl|]{4})\s*-\s*([0-9OIl|])/;
+// Exam table: find the columns from the header, OCR each column strip on its own, then line the strips up by row.
+async function readExams(D,y0){
+  if(D.H-y0<60)return [];
+  const k=1.5,wAll=await tessWorker(['tha','eng'],3);
+  const {data}=await wAll.recognize(crop(D,{x0:0,x1:D.W,y0,y1:D.H},{scale:k}),{},{blocks:true});
+  const words=[];(data.blocks||[]).forEach(b=>b.paragraphs.forEach(p=>p.lines.forEach(l=>l.words.forEach(w=>words.push({t:w.text,cx:(w.bbox.x0+w.bbox.x1)/2/k,x1:w.bbox.x1/k,y0:y0+w.bbox.y0/k,y1:y0+w.bbox.y1/k})))));
+  const codeEnds=words.filter(w=>/^[0-9OIl|]{4}-[0-9OIl|]$/.test(w.t)).map(w=>w.x1);
+  // Header words must sit on the same line as "สอบกลางภาค"/"สอบประจำภาค" (the footnote above also says รหัสวิชา and กลุ่ม).
+  const anchor=words.find(w=>/กลาง/.test(w.t))||words.find(w=>/ประจ/.test(w.t));
+  const hw=re=>words.find(w=>re.test(w.t)&&(!anchor||Math.abs((w.y0+w.y1)/2-(anchor.y0+anchor.y1)/2)<(anchor.y1-anchor.y0)));
+  const H={code:hw(/รหัส/),name:hw(/ชื่อ|ชือ|รายวิชา/),grp:hw(/กลุ่ม|กลุม/),mid:hw(/กลาง/),fin:hw(/ประจ/)};
+  const top=(H.mid||H.fin||H.code)?Math.max(...[H.code,H.mid,H.fin].filter(Boolean).map(w=>w.y1))+2:y0;
+  const W=D.W,cx={code:H.code?.cx??W*0.08,name:H.name?.cx??W*0.42,grp:H.grp?.cx??W*0.705,mid:H.mid?.cx??W*0.795,fin:H.fin?.cx??W*0.93};
+  const cut={a:Math.max(cx.code+W*0.06,cx.name-W*0.12),b:(cx.name+cx.grp)/2+(cx.grp-cx.name)*0.35,c:(cx.grp+cx.mid)/2,d:(cx.mid+cx.fin)/2};
+  const strip=async(x0,x1,langs)=>{const w=await tessWorker(langs,6),s=2;const r=await w.recognize(crop(D,{x0:Math.max(0,Math.round(x0)),x1:Math.min(W,Math.round(x1)),y0:top,y1:D.H},{scale:s}),{},{blocks:true});return ocrLines(r.data,Math.max(0,Math.round(x0)),top,s)};
+  const codeL=await strip(0,cut.a,['eng']);
+  // A code may be on one line ("DGT01 0210-1") or wrapped onto two ("DGT01" / "2110-1").
+  const rows=[];
+  for(let i=0;i<codeL.length;i++){
+    const t=codeL[i].t.replace(/\s+/g,' '),m=t.match(EXAM_RE);
+    if(m){rows.push({l:codeL[i],m});continue}
+    const a=t.match(/^\W*([A-Z][A-Z0-9|l]{2})\s?([0-9OIl|]{2})(?![0-9])/),n=codeL[i+1],b=n&&n.t.replace(/\s+/g,' ').match(/^\W*([0-9OIl|]{4})\s*-\s*([0-9OIl|])/);
+    if(a&&b){rows.push({l:{...codeL[i],cy:(codeL[i].cy+n.cy)/2,y1:n.y1},m:[null,a[1],a[2],b[1],b[2]]});i++}
+  }
+  if(!rows.length)return [];
+  if(codeEnds.length)cut.a=Math.max(...codeEnds)+6; // the name column starts right after the longest code
+  const nameL=await strip(cut.a,cut.b,['tha','eng']),grpL=await strip(cut.b,cut.c,['eng']),midL=await strip(cut.c,cut.d,['tha','eng']),finL=await strip(cut.d,W,['tha','eng']);
+  const lastGap=rows.length>1?rows[rows.length-1].l.cy-rows[rows.length-2].l.cy:80;
+  return rows.map((r,i)=>{
+    const lo=i?(rows[i-1].l.cy+r.l.cy)/2:Math.max(top,r.l.cy-lastGap/2),hi=i+1<rows.length?(r.l.cy+rows[i+1].l.cy)/2:r.l.cy+lastGap/2;
+    const inRow=L=>L.filter(l=>l.cy>=lo&&l.cy<hi).sort((p,q)=>p.y0-q.y0);
+    const names=inRow(nameL).map(l=>l.t);
+    const nameEn=(names.find(t=>/[A-Z]{3,}/.test(t)&&!/[ก-๙]{3}/.test(t))||'').replace(/[^A-Z0-9 .,&()\-]/g,'').replace(/^[^A-Z]+/,'').trim();
+    const nameTh=((names.find(t=>/[ก-๙]{3,}/.test(t)&&!/ชื่อรายวิชา|ชือรายวิชา|รหัสวิชา/.test(t))||'').match(/[ก-๙][ก-๙0-9\s]*[ก-๙0-9]/)||[''])[0].trim();
+    const grp=(inRow(grpL).map(l=>l.t).join(' ').match(/\d{1,3}/)||[''])[0];
+    return {code:fixL(r.m[1])+fixD(r.m[2])+' '+fixD(r.m[3])+'-'+fixD(r.m[4]),nameEn,nameTh,group:grp,
+      mid:examWhen(inRow(midL).map(l=>l.t).join(' ')),final:examWhen(inRow(finL).map(l=>l.t).join(' '))};
+  });
+}
+async function ocrTimetable(images,progress){
+  const out={is_timetable:false,student:{},days:[],classes:[],exams:[],notes:''},notes=[];
+  for(let n=0;n<images.length;n++){
+    const im=images[n],src=im.file?URL.createObjectURL(im.file):im.preview,D=await pixels(src);if(im.file)URL.revokeObjectURL(src);
+    progress(`รูปที่ ${n+1}/${images.length}: กำลังหาตาราง…`);
+    const G=findGrid(D);
+    if(G){
+      out.is_timetable=true;
+      progress(`รูปที่ ${n+1}: กำลังอ่านชื่อวัน…`);
+      const days=await readDays(D,G);days.forEach(d=>{if(!out.days.includes(d))out.days.push(d)});
+      const w=await tessWorker(['eng'],6);let cols;
+      for(let i=0;i<G.cells.length;i++){
+        progress(`รูปที่ ${n+1}: อ่านช่องวิชา ${i+1}/${G.cells.length}`);
+        const r=G.cells[i],read=async q=>(await w.recognize(crop(D,{x0:q.x0+2,x1:q.x1-2,y0:q.y0+1,y1:q.y1-1},{scale:Math.min(4,Math.max(2,180/(q.y1-q.y0)))}))).data.text;
+        let text=await read(r);
+        // Two neighbouring cells whose thin divider blurred away: split at the brightest vertical line and read each half.
+        const many=re=>(text.match(re)||[]).length>1;
+        if(many(new RegExp(CELL_RE.source,'g'))||many(/\d{1,2}\s*[:.]\s*\d{2}\s*[-–]\s*\d{1,2}\s*[:.]\s*\d{2}/g)||many(/\d{4}\s*[-–]\s*\d{1,2}\s*\/\s*\d{1,2}\s*\/\s*\d{4}/g)){const sx=splitX(D,r);if(sx){G.cells.splice(i+1,0,{...r,x0:sx});r.x1=sx;text=await read(r)}}
+        const c=parseCell(text);if(!c){notes.push(`อ่านช่องหนึ่งใน${days[r.row]}ไม่ออก`);continue}
+        if(!c.start){cols=cols===undefined?await headerColumns(D,G):cols;
+          if(cols){const a=cols.find(k=>r.x0+4>=k.x0-3&&r.x0+4<k.x1+3),b=cols.find(k=>r.x1-4>k.x0-3&&r.x1-4<=k.x1+3);if(a&&b){c.start=pad(a.h)+':00';c.end=pad(b.h+1)+':00'}}}
+        if(!c.start){notes.push(`${c.code} อ่านเวลาไม่ออก ใส่เวลาเองหลังบันทึก`);c.start='08:00';c.end='09:00'}
+        out.classes.push({day:days[r.row],...c,color:cellColor(D,r)});
+      }
+    }
+    progress(`รูปที่ ${n+1}: กำลังอ่านตารางสอบ…`);
+    const ex=await readExams(D,G?G.bottom+4:0);
+    ex.forEach(e=>{if(!out.exams.some(x=>x.code===e.code))out.exams.push(e)});
+    if(!G&&!ex.length)notes.push(`รูปที่ ${n+1} ไม่พบตาราง`);
+  }
+  // Repair misread course-code prefixes (e.g. "GTO01" for "DGT01") using the prefix most cells share.
+  const pre=c=>c.code.split(' ')[0],cnt={};out.classes.forEach(c=>{cnt[pre(c)]=(cnt[pre(c)]||0)+1});
+  const common=Object.keys(cnt).filter(k=>cnt[k]>=2);
+  const lev=(a,b)=>{const d=[...Array(b.length+1).keys()];for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]};
+  const fixPre=code=>{const [a,...rest]=code.split(' ');if(common.includes(a))return code;const near=common.find(k=>lev(a,k)<=2);return near?[near,...rest].join(' '):code};
+  out.classes.forEach(c=>{c.code=fixPre(c.code)});out.exams.forEach(e=>{e.code=fixPre(e.code)});
+  out.notes=['อ่านด้วย OCR ในเครื่อง อาจอ่านตัวอักษรผิดบางตัว ตรวจรหัสวิชา ห้อง และวันสอบอีกครั้ง',...notes].join(' · ');
+  return out;
+}
+
 /* ---------- upload a timetable picture, AI fills it in ---------- */
 let apiCfg=null;
 const normT=t=>{const m=String(t||'').match(/^(\d{1,2}):(\d{2})$/);return m?pad(+m[1])+':'+m[2]:''};
@@ -928,7 +1113,7 @@ async function shrinkImage(file){
     const k=Math.min(1,1800/Math.max(img.naturalWidth,img.naturalHeight));
     const c=document.createElement('canvas');c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);
     const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);
-    const d=c.toDataURL('image/jpeg',0.85);return {data:d.split(',')[1],mediaType:'image/jpeg',preview:d,name:file.name};
+    const d=c.toDataURL('image/jpeg',0.85);return {data:d.split(',')[1],mediaType:'image/jpeg',preview:d,name:file.name,file};
   }finally{URL.revokeObjectURL(url)}
 }
 function personFromAI(name,d){
@@ -948,27 +1133,32 @@ function openUpload(){
   let timer=null;
   const draw=(ov,close)=>{
     const m=ov.querySelector('.modal'),same=state.people.find(p=>p.name.trim()&&p.name.trim()===st.name.trim());
-    const avail=apiCfg===null?`<div class="mclash full">ระบบ AI ใช้ได้เฉพาะบนเว็บที่ deploy บน Vercel (หน้านี้ยังเรียก /api/extract ไม่ได้)</div>`
-      :apiCfg.ai===false?`<div class="mclash full">ยังไม่ได้ตั้งค่า GEMINI_API_KEY (ฟรี) หรือ ANTHROPIC_API_KEY ใน Vercel ระบบ AI จึงยังใช้ไม่ได้</div>`:'';
+    const aiOk=!!(apiCfg&&apiCfg.ai!==false);
+    const avail=apiCfg===null?`<div class="note full">หน้านี้ยังเรียกระบบ AI ไม่ได้ (ใช้ได้บนเว็บที่ deploy บน Vercel) ใช้ปุ่ม “อ่านด้วย OCR ฟรี” แทนได้</div>`
+      :apiCfg.ai===false?`<div class="note full">ยังไม่ได้ตั้งค่า key ของ AI ใน Vercel ใช้ปุ่ม “อ่านด้วย OCR ฟรี” แทนได้</div>`:'';
     if(st.step==='pick'){
       m.innerHTML=`<h2>อัปโหลดรูปตารางเรียน</h2>
-        <p class="note" style="margin:0">ใส่ชื่อ แล้วเลือกรูปหน้า “ตารางเรียน/สอบ” จากระบบทะเบียน (แคปหน้าจอได้เลย ใส่ได้สูงสุด 4 รูป เช่น ตารางเรียน + ตารางสอบ) AI จะอ่านแล้วกรอกวิชาและวันสอบให้</p>
+        <p class="note" style="margin:0">ใส่ชื่อ แล้วเลือกรูปหน้า “ตารางเรียน/สอบ” จากระบบทะเบียน (แคปหน้าจอได้เลย ใส่ได้สูงสุด 4 รูป) แล้วเลือกวิธีอ่าน: <b>AI</b> แม่นกว่า หรือ <b>OCR ฟรี</b> อ่านในเครื่องนี้ ไม่ต้องใช้ key ไม่ส่งรูปออกไปไหน</p>
         <form class="form" id="uf">
           <label class="full">ชื่อเจ้าของตาราง<input id="u-name" value="${esc(st.name)}" placeholder="เช่น อัจฉรียา พุทธโคตร" required autocomplete="name"></label>
           <label class="full">รูปตาราง<input type="file" id="u-file" accept="image/*" multiple></label>
           ${st.images.length?`<div class="full thumbs">${st.images.map((im,i)=>`<figure><img src="${im.preview}" alt="${esc(im.name)}"><button type="button" class="ib" data-rm="${i}" aria-label="เอารูปนี้ออก">✕</button></figure>`).join('')}</div>`:'<div class="full note">หรือกด Ctrl+V / วางรูปที่คัดลอกไว้ได้</div>'}
           ${avail}
           ${st.error?`<div class="mclash full">${esc(st.error)}</div>`:''}
-          <div class="actions full"><button type="button" class="btn" id="u-cancel">ยกเลิก</button><button class="btn primary" id="u-go"${st.images.length?'':' disabled'}>ให้ AI อ่านตาราง</button></div>
+          <div class="actions full"><button type="button" class="btn" id="u-cancel">ยกเลิก</button><span class="spacer"></span>
+            <button type="button" class="btn${aiOk?'':' primary'}" id="u-ocr"${st.images.length?'':' disabled'}>อ่านด้วย OCR ฟรี</button>
+            ${aiOk||apiCfg===null?`<button class="btn${aiOk?' primary':''}" id="u-go"${st.images.length?'':' disabled'}>ให้ AI อ่านตาราง</button>`:''}</div>
         </form>`;
       const nm=m.querySelector('#u-name');nm.oninput=()=>{st.name=nm.value};
       m.querySelector('#u-file').onchange=async e=>{await addFiles([...e.target.files])};
       m.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{st.images.splice(+b.dataset.rm,1);draw(ov,close)});
       m.querySelector('#u-cancel').onclick=close;
-      m.querySelector('#uf').onsubmit=e=>{e.preventDefault();if(!st.name.trim()){nm.focus();return}if(st.images.length)run()};
+      const ready=()=>{if(!st.name.trim()){nm.focus();nm.reportValidity&&nm.reportValidity();return false}return st.images.length>0};
+      m.querySelector('#uf').onsubmit=e=>{e.preventDefault();if(ready())run()};
+      m.querySelector('#u-ocr').onclick=()=>{if(ready())runOCR()};
     }else if(st.step==='busy'){
-      m.innerHTML=`<h2>AI กำลังอ่านตาราง…</h2><div class="loading"><span class="spin"></span><span>อ่าน ${st.images.length} รูปของ ${esc(st.name)} · <span id="u-sec">0</span> วินาที</span></div>
-        <p class="note" style="margin:0">ปกติใช้เวลาประมาณ 20–60 วินาที อย่าปิดหน้านี้</p>`;
+      m.innerHTML=`<h2>${st.kind==='ocr'?'OCR กำลังอ่านตาราง…':'AI กำลังอ่านตาราง…'}</h2><div class="loading"><span class="spin"></span><span>อ่าน ${st.images.length} รูปของ ${esc(st.name)} · <span id="u-sec">0</span> วินาที</span></div>
+        <p class="note" style="margin:0" id="u-msg">${st.kind==='ocr'?'ครั้งแรกต้องโหลดตัวอ่านภาษาไทยประมาณ 5 MB ใช้เวลาประมาณ 20–60 วินาที':'ปกติใช้เวลาประมาณ 20–60 วินาที อย่าปิดหน้านี้'}</p>`;
     }else{
       const p=st.result,byDay=ALL_DAYS.map(d=>[d,p.classes.filter(c=>c.day===d).sort((a,b)=>toMin(a.start)-toMin(b.start))]).filter(x=>x[1].length);
       m.innerHTML=`<h2>ตรวจข้อมูลก่อนบันทึก</h2>
@@ -995,8 +1185,20 @@ function openUpload(){
       draw(ov,close);
     }
     ov.onpaste=e=>{if(st.step!=='pick')return;const fs=[...(e.clipboardData?.files||[])];if(fs.length){e.preventDefault();addFiles(fs)}};
+    async function runOCR(){
+      st.step='busy';st.kind='ocr';st.error='';st.t0=Date.now();draw(ov,close);
+      timer=setInterval(()=>{const s=document.getElementById('u-sec');if(s)s.textContent=Math.round((Date.now()-st.t0)/1000);else clearInterval(timer)},1000);
+      try{
+        const data=await ocrTimetable(st.images,msg=>{const e=document.getElementById('u-msg');if(e)e.textContent=msg});
+        st.result=personFromAI(st.name.trim(),data);st.notes=data.notes||'';st.model='OCR ในเครื่อง (Tesseract)';
+        if(!st.result.classes.length)throw new Error('OCR หาตารางเรียนในรูปไม่เจอ ลองใช้รูปแคปหน้าจอจากระบบทะเบียนที่ไม่ได้ครอปตาราง หรือลองให้ AI อ่าน');
+        st.mode=state.people.some(p=>p.name.trim()===st.name.trim())?'replace':'new';st.step='review';
+      }catch(e){console.error(e);st.step='pick';st.error=/โหลดไลบรารี|Failed to fetch|NetworkError|importScripts/i.test(e.message||'')?'โหลดตัวอ่าน OCR ไม่ได้ ตรวจอินเทอร์เน็ตแล้วลองใหม่':(e.message||'OCR อ่านไม่สำเร็จ')}
+      finally{clearInterval(timer)}
+      if(document.body.contains(ov))draw(ov,close);
+    }
     async function run(){
-      st.step='busy';st.error='';st.t0=Date.now();draw(ov,close);
+      st.step='busy';st.kind='ai';st.error='';st.t0=Date.now();draw(ov,close);
       timer=setInterval(()=>{const s=document.getElementById('u-sec');if(s)s.textContent=Math.round((Date.now()-st.t0)/1000);else clearInterval(timer)},1000);
       const ac=new AbortController(),to=setTimeout(()=>ac.abort(),150000);
       try{
@@ -1006,7 +1208,7 @@ function openUpload(){
         st.result=personFromAI(st.name.trim(),j.data);st.notes=j.data.notes||'';st.model=j.model||'';
         if(!st.result.classes.length)throw new Error('AI ไม่พบคาบเรียนในรูป ลองใช้รูปที่เห็นตารางชัด ๆ');
         st.mode=state.people.some(p=>p.name.trim()===st.name.trim())?'replace':'new';st.step='review';
-      }catch(e){st.step='pick';st.error=e.name==='AbortError'?'รอนานเกินไป ลองใหม่อีกครั้ง หรืออัปโหลดทีละรูป':(e.message==='Failed to fetch'?'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง':e.message)}
+      }catch(e){st.step='pick';st.error=(e.name==='AbortError'?'รอนานเกินไป ลองใหม่อีกครั้ง หรืออัปโหลดทีละรูป':(e.message==='Failed to fetch'?'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง':e.message))+' · กด “อ่านด้วย OCR ฟรี” แทนได้'}
       finally{clearTimeout(to);clearInterval(timer)}
       if(document.body.contains(ov))draw(ov,close);
     }
