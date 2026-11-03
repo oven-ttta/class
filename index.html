@@ -9,7 +9,7 @@
 <title>สมุดตารางเรียน</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@500;600;700&family=Sarabun:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap">
 <style>
 /* Layout: registrar-style timetable sheet; person tabs on top, editable profile, day×hour grid, exam table below */
 :root{
@@ -18,7 +18,7 @@
   --b-blue:#c3cbf7; --b-rose:#f0a3a3; --b-green:#bfe2c8; --b-amber:#f4d898; --b-violet:#dcc7f2; --b-ink:#1b2133;
   --b-teal:#b5e0dc; --b-peach:#f6c6a8; --b-sky:#b9def5; --b-slate:#d3d6de; --busy:#d4d7df; --ok:#3f8f5a; --ok-bg:#e3f3e8; --bad-bg:#fbe5e3;
   --danger:#b3261e; --shadow:0 1px 2px rgba(20,30,60,.08),0 6px 20px rgba(20,30,60,.06);
-  --f-display:"Anuphan","Sarabun",system-ui,sans-serif; --f-body:"Sarabun",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+  --f-display:"Sarabun","TH Sarabun New","TH SarabunPSK",system-ui,sans-serif; --f-body:"Sarabun","TH Sarabun New","TH SarabunPSK",system-ui,sans-serif; --f-mono:"Sarabun","TH Sarabun New","TH SarabunPSK",system-ui,sans-serif;
   --daycol:86px; --slot:34px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
@@ -83,7 +83,7 @@ button{cursor:pointer}
 .ge:hover{background:color-mix(in srgb,var(--accent) 14%,var(--cell))}
 .gc{border:0;text-align:center;padding:4px 6px;color:var(--b-ink);display:flex;flex-direction:column;justify-content:center;align-items:center;line-height:1.3;font-size:.74rem;min-height:56px;z-index:1;min-width:0;overflow:hidden}
 .gc:hover{filter:brightness(.96)}
-.gc .code{font-family:var(--f-mono);color:var(--accent);font-size:.72rem}
+.gc .code{font-family:var(--f-mono);font-weight:600;font-variant-numeric:tabular-nums;color:var(--accent);font-size:.72rem}
 .gc.big{font-size:.95rem}
 .gc.big .code{font-size:.95rem;font-weight:700}
 .gc[data-c="blue"]{background:var(--b-blue)} .gc[data-c="rose"]{background:var(--b-rose)}
