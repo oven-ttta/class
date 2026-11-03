@@ -13,21 +13,22 @@
 
 ## ตั้งค่า (ครั้งเดียว)
 
-### 1. Supabase
-1. สมัคร / เข้า https://supabase.com แล้วกด **New project**
-2. เข้าเมนู **SQL Editor** → **New query** วางเนื้อหาไฟล์ `supabase/schema.sql` แล้วกด **Run**
-3. เข้า **Project Settings → API** จดค่า **Project URL** และ **anon public key**
+### 1. Supabase (โปรเจกต์ `lttlyffbyomlhvzslscl`)
+1. เข้า https://supabase.com/dashboard/project/lttlyffbyomlhvzslscl/sql/new
+2. วางเนื้อหาไฟล์ `supabase/schema.sql` แล้วกด **Run** (ทำครั้งเดียว)
+
+URL และ publishable key ใส่ไว้ใน `api/config.js` แล้ว ไม่ต้องตั้งเพิ่ม
 
 ### 2. Vercel
-1. เข้า https://vercel.com/new แล้ว **Import** repo `oven-ttta/class` (เลือก branch นี้หรือ merge เข้า main ก่อน)
-2. Framework Preset: **Other** ไม่ต้องตั้ง Build Command
-3. ในหัวข้อ **Environment Variables** ใส่
-   - `SUPABASE_URL` = Project URL
-   - `SUPABASE_ANON_KEY` = anon public key
-4. กด **Deploy**
+1. เข้า https://vercel.com/new แล้ว **Import** repo `oven-ttta/class`
+2. Framework Preset: **Other** ไม่ต้องตั้ง Build Command และไม่ต้องใส่ Environment Variables
+3. กด **Deploy**
 
 เปิดเว็บแล้วป้ายด้านบนจะเป็นสีเขียว “ออนไลน์ · อัปเดตเรียลไทม์”
 ครั้งแรกที่เปิด เว็บจะใส่ข้อมูลตัวอย่างลงฐานข้อมูลให้เอง
+
+ถ้าต้องการเปลี่ยนไปใช้โปรเจกต์ Supabase อื่น ให้ตั้ง Environment Variables ใน Vercel
+`NEXT_PUBLIC_SUPABASE_URL` และ `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (หรือ `SUPABASE_URL` / `SUPABASE_ANON_KEY`)
 
 ## หมายเหตุ
 - ไม่มีระบบล็อกอิน ใครมีลิงก์เว็บก็ดูและแก้ไขได้
