@@ -18,6 +18,7 @@
   --b-blue:#c3cbf7; --b-rose:#f0a3a3; --b-green:#bfe2c8; --b-amber:#f4d898; --b-violet:#dcc7f2; --b-ink:#1b2133;
   --b-teal:#b5e0dc; --b-peach:#f6c6a8; --b-sky:#b9def5; --b-slate:#d3d6de; --busy:#d4d7df; --ok:#3f8f5a; --ok-bg:#e3f3e8; --bad-bg:#fbe5e3;
   --danger:#b3261e; --shadow:0 1px 2px rgba(20,30,60,.08),0 6px 20px rgba(20,30,60,.06);
+  --sk:color-mix(in srgb,var(--line) 75%,var(--surface)); --sk-hi:color-mix(in srgb,var(--line) 25%,var(--surface));
   --f-display:"Sarabun","TH Sarabun New","TH SarabunPSK",system-ui,sans-serif; --f-body:"Sarabun","TH Sarabun New","TH SarabunPSK",system-ui,sans-serif; --f-mono:"Sarabun","TH Sarabun New","TH SarabunPSK",system-ui,sans-serif;
   --daycol:86px; --slot:34px;
 }
@@ -266,6 +267,23 @@ dl.info dt{color:var(--muted)} dl.info dd{margin:0;min-width:0;overflow-wrap:any
 dl.info dd.empty{color:var(--muted)}
 td.act{white-space:nowrap;text-align:right}
 @media (max-width:560px){dl.info{grid-template-columns:1fr;gap:0 0} dl.info dd{margin-bottom:6px}}
+.sk{display:block;border-radius:6px;background:linear-gradient(90deg,var(--sk) 0%,var(--sk-hi) 45%,var(--sk) 90%);background-size:220% 100%;animation:sk 1.3s ease-in-out infinite}
+@keyframes sk{from{background-position:120% 0}to{background-position:-120% 0}}
+@media (prefers-reduced-motion:reduce){.sk{animation:none;background:var(--sk)}}
+.sk-line{height:12px}.sk-title{height:26px;width:min(320px,70%)}.sk-btn{height:36px;width:110px;border-radius:8px}
+.sk-input{height:36px;border-radius:8px}
+.skgrid{display:grid;grid-template-columns:var(--daycol) repeat(8,minmax(var(--slot),1fr));gap:2px;min-width:640px}
+.skgrid .sk{border-radius:0;min-height:54px}
+.skgrid .sk.h{min-height:30px;background:var(--head);animation:none;opacity:.35}
+.skgrid .sk.d{background:var(--day);animation:none;opacity:.45}
+.skgrid .sk.e{background:var(--cell);animation:none}
+.skgrid .sk.b{background:linear-gradient(90deg,color-mix(in srgb,var(--b-blue) 70%,var(--surface)) 0%,var(--b-blue) 45%,color-mix(in srgb,var(--b-blue) 70%,var(--surface)) 90%);background-size:220% 100%}
+.skrow{display:grid;grid-template-columns:1fr 3fr .6fr 1fr 1fr;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line)}
+.skrow .sk{height:12px}
+.skitem{display:flex;flex-direction:column;gap:6px;padding:8px 10px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (max-width:900px){.skside{flex-direction:row;overflow:hidden}.skside .skitem{flex:none;width:150px;border:1px solid var(--line);border-radius:8px}}
+@media (max-width:640px){.skrow{grid-template-columns:1fr 2fr}.skrow .sk:nth-child(n+3){display:none}}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:.9rem;z-index:60}
 @media (max-width:560px){
   .profile{grid-template-columns:1fr}
@@ -282,7 +300,7 @@ td.act{white-space:nowrap;text-align:right}
     <button role="tab" id="tabStudy" data-view="study">ตารางเรียน (มหาลัย)</button>
     <button role="tab" id="tabTeach" data-view="teach">ตารางสอนเด็ก</button>
   </div>
-  <span class="sync" id="sync" data-s="local">บันทึกในเครื่องนี้</span>
+  <span class="sync" id="sync" data-s="connecting">กำลังโหลด…</span>
 </div></header>
 
 <div class="wrap">
@@ -401,7 +419,35 @@ function toast(msg){const t=document.createElement('div');t.className='toast';t.
 let view='study';
 function setView(v){view=v==='teach'?'teach':'study';try{if(location.hash.slice(1)!==view)history.replaceState(null,'','#'+view)}catch(e){}render()}
 window.addEventListener('hashchange',()=>setView(location.hash.slice(1)));
+let booting=true;
+const SK=(cls,style='')=>`<span class="sk ${cls}"${style?` style="${style}"`:''}></span>`;
+function skGrid(){
+  // A stand-in timetable: header, five day rows, and a few class blocks where a real week usually has them.
+  const blocks=[[0,1,3],[0,5,2],[1,2,2],[2,1,3],[2,5,2],[3,1,3],[3,5,4],[4,5,2]];
+  let h=SK('h')+Array.from({length:8},()=>SK('h')).join('');
+  for(let d=0;d<5;d++){h+=SK('d',`grid-row:${d+2};grid-column:1`);
+    for(let c=0;c<8;c++)h+=SK('e',`grid-row:${d+2};grid-column:${c+2}`);
+    blocks.filter(b=>b[0]===d).forEach(([,c,w])=>{h+=SK('b',`grid-row:${d+2};grid-column:${c+1}/span ${w}`)})}
+  return `<div class="scroll"><div class="skgrid">${h}</div></div>`;
+}
+const skRows=n=>Array.from({length:n},(_,i)=>`<div class="skrow">${SK('','width:80%')}${SK('',`width:${60+(i*17)%35}%`)}${SK('','width:40%')}${SK('','width:85%')}${SK('','width:85%')}</div>`).join('');
+function skHead(){return `<div class="sheet-head"><div style="display:flex;flex-direction:column;gap:8px">${SK('sk-line','width:220px')}${SK('sk-title')}${SK('sk-line','width:180px')}</div><div class="head-actions">${SK('sk-btn')}${SK('sk-btn')}</div></div>`}
+function renderSkeleton(){
+  document.getElementById('vStudy').hidden=view!=='study';document.getElementById('vTeach').hidden=view!=='teach';
+  document.getElementById('tabStudy').setAttribute('aria-selected',view==='study');document.getElementById('tabTeach').setAttribute('aria-selected',view==='teach');
+  const filters=`<div class="filters">${SK('sk-input','flex:1 1 200px')}${SK('sk-input','width:160px')}${SK('sk-input','width:130px')}</div>`;
+  document.getElementById('people').innerHTML=`<span class="sr" role="status">กำลังโหลดตารางเรียน…</span><div class="side-h">${SK('sk-line','width:110px;height:16px')}${SK('sk-line','width:36px')}</div>${SK('sk-input')}${SK('sk-input')}
+    <div class="plist skside">${Array.from({length:4},(_,i)=>`<div class="skitem">${SK('sk-line',`width:${70+(i*13)%25}%;height:14px`)}${SK('sk-line','width:55%;height:10px')}</div>`).join('')}</div>${SK('sk-btn','width:100%')}`;
+  document.getElementById('sheet').innerHTML=skHead()+`<div style="border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px">${SK('sk-line','width:120px')}${SK('sk-line','width:60%')}${SK('sk-line','width:45%')}</div>`+filters+skGrid();
+  document.getElementById('exams').innerHTML=`<div class="exam-h" style="opacity:.5">ตารางสอบ</div>${filters}<div>${skRows(5)}</div>`;
+  document.getElementById('tSheet').innerHTML=skHead()+filters+skGrid();
+  document.getElementById('tSubjects').innerHTML=`<div class="exam-h" style="opacity:.5">รายวิชา</div>${filters}<div>${skRows(6)}</div>`;
+  document.getElementById('tTeachers').innerHTML=skHead()+`<div>${skRows(4)}</div>`;
+  document.querySelector('.wrap').setAttribute('aria-busy','true');
+}
 function render(){
+  if(booting)return renderSkeleton();
+  document.querySelector('.wrap').removeAttribute('aria-busy');
   document.getElementById('vStudy').hidden=view!=='study';document.getElementById('vTeach').hidden=view!=='teach';
   document.getElementById('tabStudy').setAttribute('aria-selected',view==='study');document.getElementById('tabTeach').setAttribute('aria-selected',view==='teach');
   const a=document.activeElement,aid=a&&a.id,sel=a&&a.type==='search'?[a.selectionStart,a.selectionEnd]:null;
@@ -1158,7 +1204,8 @@ function openUpload(){
       m.querySelector('#u-ocr').onclick=()=>{if(ready())runOCR()};
     }else if(st.step==='busy'){
       m.innerHTML=`<h2>${st.kind==='ocr'?'OCR กำลังอ่านตาราง…':'AI กำลังอ่านตาราง…'}</h2><div class="loading"><span class="spin"></span><span>อ่าน ${st.images.length} รูปของ ${esc(st.name)} · <span id="u-sec">0</span> วินาที</span></div>
-        <p class="note" style="margin:0" id="u-msg">${st.kind==='ocr'?'ครั้งแรกต้องโหลดตัวอ่านภาษาไทยประมาณ 5 MB ใช้เวลาประมาณ 20–60 วินาที':'ปกติใช้เวลาประมาณ 20–60 วินาที อย่าปิดหน้านี้'}</p>`;
+        <p class="note" style="margin:0" id="u-msg">${st.kind==='ocr'?'ครั้งแรกต้องโหลดตัวอ่านภาษาไทยประมาณ 5 MB ใช้เวลาประมาณ 20–60 วินาที':'ปกติใช้เวลาประมาณ 20–60 วินาที อย่าปิดหน้านี้'}</p>
+        <div class="upv" aria-hidden="true">${['','',''].map((_,d)=>`<div style="display:flex;flex-direction:column;gap:8px">${SK('sk-line','width:70px;height:14px')}${[0,1].map(i=>`<div class="upr">${SK('sk-line','width:80%')}${SK('sk-line',`width:${55+((d*2+i)*19)%40}%`)}</div>`).join('')}</div>`).join('')}</div>`;
     }else{
       const p=st.result,byDay=ALL_DAYS.map(d=>[d,p.classes.filter(c=>c.day===d).sort((a,b)=>toMin(a.start)-toMin(b.start))]).filter(x=>x[1].length);
       m.innerHTML=`<h2>ตรวจข้อมูลก่อนบันทึก</h2>
@@ -1274,7 +1321,7 @@ async function initCloud(){
     const {data,error}=await sb.from(TABLE).select('id,kind,sort,data');if(error)throw error;
     cloud={sb,synced:new Map(),sort:new Map(),live:false};
     if(data.length){
-      const keep=state.currentId;state.people=[];state.teach=null;applyRows(data);state.currentId=keep;fixState();
+      const keep=state.currentId;state.people=[];state.teach=null;applyRows(data);state.currentId=keep;fixState();booting=false;
       try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}render();
     }else{await push();toast('สร้างข้อมูลเริ่มต้นในฐานข้อมูลแล้ว')}
     sb.channel('schedule-docs').on('postgres_changes',{event:'*',schema:'public',table:TABLE},onRemote)
@@ -1311,7 +1358,8 @@ bDel.onclick=()=>{
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 view=location.hash.slice(1)==='teach'?'teach':'study';
 render();
-initCloud();
+// Leave the skeleton once the shared database has answered, or after 8 s show what this device has.
+Promise.race([initCloud().catch(()=>{}),new Promise(r=>setTimeout(r,8000))]).finally(()=>{if(!cloud&&document.getElementById('sync').dataset.s==='connecting')setSync('local');if(booting){booting=false;render()}});
 </script>
 
 </body>
