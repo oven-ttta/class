@@ -243,6 +243,19 @@ details.tools summary{padding:0}
   #tSubjects table.cards tr{grid-template-columns:repeat(3,minmax(0,1fr));padding-right:40px}
   table.cards td.span2,#tSubjects table.cards td.wide{grid-column:span 2}
 }
+.thumbs{display:flex;gap:8px;flex-wrap:wrap}
+.thumbs figure{margin:0;position:relative;width:96px;height:96px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--cell)}
+.thumbs img{width:100%;height:100%;object-fit:cover}
+.thumbs .ib{position:absolute;top:4px;right:4px;width:26px;height:26px}
+.loading{display:flex;align-items:center;gap:12px;padding:12px 0}
+.spin{width:22px;height:22px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:3s}}
+.upv{display:flex;flex-direction:column;gap:10px;max-height:46vh;overflow:auto;font-size:.88rem}
+.upr{display:grid;grid-template-columns:7.5em minmax(0,1fr);gap:8px;padding:3px 0;border-bottom:1px solid var(--line)}
+.upr .at{font-variant-numeric:tabular-nums;color:var(--muted)}
+.upv .code{font-weight:600;color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:.9rem;z-index:60}
 @media (max-width:560px){
   .profile{grid-template-columns:1fr}
@@ -427,9 +440,11 @@ function renderPeople(){
     <select class="q" id="so-people" data-ui="psort" aria-label="เรียงลำดับ">${opt('psort','order','เรียงตามลำดับที่เพิ่ม')}${opt('psort','az','ชื่อ ก → ฮ')}${opt('psort','za','ชื่อ ฮ → ก')}${opt('psort','hours','ชั่วโมงเรียนมาก → น้อย')}</select>
     <div class="plist">${list.map(x=>`<button class="pitem" data-id="${x.p.id}" aria-pressed="${x.p.id===cur().id}"><span class="pn">${esc(x.p.name||'(ไม่มีชื่อ)')}</span><span class="ps">${x.n} วิชา · ${fmtH(x.h)} ชม./สัปดาห์</span></button>`).join('')}</div>
     ${list.length?'':'<div class="note">ไม่พบชื่อหรือรหัสวิชาที่ค้นหา</div>'}
-    <button class="btn" id="addPerson">+ เพิ่มคน</button>`;
+    <button class="btn primary" id="uploadPerson">อัปโหลดรูปตาราง (AI กรอกให้)</button>
+    <button class="btn" id="addPerson">+ เพิ่มคนแบบกรอกเอง</button>`;
   bindUI(el);
   el.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{state.currentId=b.dataset.id;commit()});
+  el.querySelector('#uploadPerson').onclick=openUpload;
   el.querySelector('#addPerson').onclick=()=>{const p=person('คนใหม่',{advisor:''});state.people.push(p);state.currentId=p.id;ui.pq='';saveUI();commit();
     setTimeout(()=>{const f=document.getElementById('f-name');f&&(f.focus(),f.select())},0)};
 }
@@ -857,6 +872,102 @@ function openSlot(s,preset){
   });
 }
 
+/* ---------- upload a timetable picture, AI fills it in ---------- */
+let apiCfg=null;
+const normT=t=>{const m=String(t||'').match(/^(\d{1,2}):(\d{2})$/);return m?pad(+m[1])+':'+m[2]:''};
+async function shrinkImage(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const img=await new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=()=>no(new Error('เปิดรูป '+file.name+' ไม่ได้ ลองใช้ไฟล์ JPG หรือ PNG'));i.src=url});
+    const k=Math.min(1,1800/Math.max(img.naturalWidth,img.naturalHeight));
+    const c=document.createElement('canvas');c.width=Math.round(img.naturalWidth*k);c.height=Math.round(img.naturalHeight*k);
+    const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(img,0,0,c.width,c.height);
+    const d=c.toDataURL('image/jpeg',0.85);return {data:d.split(',')[1],mediaType:'image/jpeg',preview:d,name:file.name};
+  }finally{URL.revokeObjectURL(url)}
+}
+function personFromAI(name,d){
+  const classes=(d.classes||[]).map(c=>({...c,start:normT(c.start),end:normT(c.end)}))
+    .filter(c=>ALL_DAYS.includes(c.day)&&c.start&&c.end&&toMin(c.end)>toMin(c.start))
+    .map(c=>({id:uid(),day:c.day,start:c.start,end:c.end,code:String(c.code||'').trim(),group:String(c.group||''),room:c.room||'',dates:c.dates||'',color:COLORS.some(([k])=>k===c.color)?c.color:'blue'}));
+  let days=ALL_DAYS.filter(x=>(d.days||[]).includes(x)||classes.some(c=>c.day===x));
+  days=ALL_DAYS.filter((x,i)=>i<5||days.includes(x));
+  const s=d.student||{};
+  return person(name,{
+    status:s.status||PROFILE.status,faculty:s.faculty||PROFILE.faculty,program:s.program||PROFILE.program,advisor:s.advisor||'',year:s.year||PROFILE.year,term:s.term||PROFILE.term,
+    startHour:Math.min(9,...classes.map(c=>Math.floor(toMin(c.start)/60))),endHour:Math.max(17,...classes.map(c=>Math.ceil(toMin(c.end)/60))),
+    days,classes,exams:(d.exams||[]).map(e=>({id:uid(),code:e.code||'',nameEn:e.nameEn||'',nameTh:e.nameTh||'',group:String(e.group||''),mid:e.mid||'-',final:e.final||'-'}))});
+}
+function openUpload(){
+  const st={step:'pick',name:'',images:[],error:'',result:null,mode:'new',t0:0};
+  let timer=null;
+  const draw=(ov,close)=>{
+    const m=ov.querySelector('.modal'),same=state.people.find(p=>p.name.trim()&&p.name.trim()===st.name.trim());
+    const avail=apiCfg===null?`<div class="mclash full">ระบบ AI ใช้ได้เฉพาะบนเว็บที่ deploy บน Vercel (หน้านี้ยังเรียก /api/extract ไม่ได้)</div>`
+      :apiCfg.ai===false?`<div class="mclash full">ยังไม่ได้ตั้งค่า ANTHROPIC_API_KEY ใน Vercel ระบบ AI จึงยังใช้ไม่ได้</div>`:'';
+    if(st.step==='pick'){
+      m.innerHTML=`<h2>อัปโหลดรูปตารางเรียน</h2>
+        <p class="note" style="margin:0">ใส่ชื่อ แล้วเลือกรูปหน้า “ตารางเรียน/สอบ” จากระบบทะเบียน (แคปหน้าจอได้เลย ใส่ได้สูงสุด 4 รูป เช่น ตารางเรียน + ตารางสอบ) AI จะอ่านแล้วกรอกวิชาและวันสอบให้</p>
+        <form class="form" id="uf">
+          <label class="full">ชื่อเจ้าของตาราง<input id="u-name" value="${esc(st.name)}" placeholder="เช่น อัจฉรียา พุทธโคตร" required autocomplete="name"></label>
+          <label class="full">รูปตาราง<input type="file" id="u-file" accept="image/*" multiple></label>
+          ${st.images.length?`<div class="full thumbs">${st.images.map((im,i)=>`<figure><img src="${im.preview}" alt="${esc(im.name)}"><button type="button" class="ib" data-rm="${i}" aria-label="เอารูปนี้ออก">✕</button></figure>`).join('')}</div>`:'<div class="full note">หรือกด Ctrl+V / วางรูปที่คัดลอกไว้ได้</div>'}
+          ${avail}
+          ${st.error?`<div class="mclash full">${esc(st.error)}</div>`:''}
+          <div class="actions full"><button type="button" class="btn" id="u-cancel">ยกเลิก</button><button class="btn primary" id="u-go"${st.images.length?'':' disabled'}>ให้ AI อ่านตาราง</button></div>
+        </form>`;
+      const nm=m.querySelector('#u-name');nm.oninput=()=>{st.name=nm.value};
+      m.querySelector('#u-file').onchange=async e=>{await addFiles([...e.target.files])};
+      m.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{st.images.splice(+b.dataset.rm,1);draw(ov,close)});
+      m.querySelector('#u-cancel').onclick=close;
+      m.querySelector('#uf').onsubmit=e=>{e.preventDefault();if(!st.name.trim()){nm.focus();return}if(st.images.length)run()};
+    }else if(st.step==='busy'){
+      m.innerHTML=`<h2>AI กำลังอ่านตาราง…</h2><div class="loading"><span class="spin"></span><span>อ่าน ${st.images.length} รูปของ ${esc(st.name)} · <span id="u-sec">0</span> วินาที</span></div>
+        <p class="note" style="margin:0">ปกติใช้เวลาประมาณ 20–60 วินาที อย่าปิดหน้านี้</p>`;
+    }else{
+      const p=st.result,byDay=ALL_DAYS.map(d=>[d,p.classes.filter(c=>c.day===d).sort((a,b)=>toMin(a.start)-toMin(b.start))]).filter(x=>x[1].length);
+      m.innerHTML=`<h2>ตรวจข้อมูลก่อนบันทึก</h2>
+        <div class="status ok"><b>อ่านได้ ${p.classes.length} คาบเรียน · ${p.exams.length} วิชาในตารางสอบ</b><span class="note">เช็คว่าตรงกับรูป หลังบันทึกแล้วแตะวิชาในตารางเพื่อแก้ได้เสมอ</span></div>
+        ${st.notes?`<div class="warn">AI แจ้งว่า: ${esc(st.notes)}</div>`:''}
+        <div class="upv">${byDay.map(([d,l])=>`<div><b>${esc(d)}</b>${l.map(c=>`<div class="upr"><span class="at">${esc(c.start)}-${esc(c.end)}</span><span><span class="code">${esc(c.code)}</span>${c.group?' กลุ่ม '+esc(c.group):''} · ${esc(c.room)}${c.dates?` <span class="note">${esc(c.dates)}</span>`:''}</span></div>`).join('')}</div>`).join('')}</div>
+        ${same?`<div class="form"><label class="full">มีตารางชื่อ “${esc(same.name)}” อยู่แล้ว
+          <select id="u-mode"><option value="replace"${st.mode==='replace'?' selected':''}>แทนที่ตารางเดิมของ ${esc(same.name)}</option><option value="new"${st.mode==='new'?' selected':''}>สร้างเป็นตารางใหม่</option></select></label></div>`:''}
+        <div class="actions"><button class="btn" id="u-back">เลือกรูปใหม่</button><span class="spacer"></span><button class="btn" id="u-cancel">ยกเลิก</button><button class="btn primary" id="u-save">บันทึกตารางของ ${esc(st.name)}</button></div>`;
+      const md=m.querySelector('#u-mode');md&&(md.onchange=()=>{st.mode=md.value});
+      m.querySelector('#u-back').onclick=()=>{st.step='pick';st.result=null;draw(ov,close)};
+      m.querySelector('#u-cancel').onclick=close;
+      m.querySelector('#u-save').onclick=()=>{
+        if(same&&st.mode==='replace'){const id=same.id;Object.assign(same,p,{id});state.currentId=id}
+        else{state.people.push(p);state.currentId=p.id}
+        Object.assign(ui,{pq:'',cq:'',cdate:''});saveUI();close();setView('study');commit();toast('บันทึกตารางของ '+st.name+' แล้ว')};
+    }
+    async function addFiles(files){
+      const imgs=files.filter(f=>f.type.startsWith('image/')||/\.(heic|heif)$/i.test(f.name));
+      if(!imgs.length)return;
+      st.error='';
+      for(const f of imgs){if(st.images.length>=4){st.error='ใส่ได้สูงสุด 4 รูป';break}
+        try{st.images.push(await shrinkImage(f))}catch(e){st.error=e.message}}
+      draw(ov,close);
+    }
+    ov.onpaste=e=>{if(st.step!=='pick')return;const fs=[...(e.clipboardData?.files||[])];if(fs.length){e.preventDefault();addFiles(fs)}};
+    async function run(){
+      st.step='busy';st.error='';st.t0=Date.now();draw(ov,close);
+      timer=setInterval(()=>{const s=document.getElementById('u-sec');if(s)s.textContent=Math.round((Date.now()-st.t0)/1000);else clearInterval(timer)},1000);
+      const ac=new AbortController(),to=setTimeout(()=>ac.abort(),150000);
+      try{
+        const r=await fetch('/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({images:st.images.map(({data,mediaType})=>({data,mediaType}))}),signal:ac.signal});
+        let j=null;try{j=await r.json()}catch(e){}
+        if(!r.ok||!j||!j.data)throw new Error((j&&j.error)||(r.status===404?'ระบบ AI ใช้ได้เฉพาะบนเว็บที่ deploy บน Vercel':'อ่านตารางไม่สำเร็จ ('+r.status+') ลองใหม่อีกครั้ง'));
+        st.result=personFromAI(st.name.trim(),j.data);st.notes=j.data.notes||'';
+        if(!st.result.classes.length)throw new Error('AI ไม่พบคาบเรียนในรูป ลองใช้รูปที่เห็นตารางชัด ๆ');
+        st.mode=state.people.some(p=>p.name.trim()===st.name.trim())?'replace':'new';st.step='review';
+      }catch(e){st.step='pick';st.error=e.name==='AbortError'?'รอนานเกินไป ลองใหม่อีกครั้ง หรืออัปโหลดทีละรูป':(e.message==='Failed to fetch'?'เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ลองใหม่อีกครั้ง':e.message)}
+      finally{clearTimeout(to);clearInterval(timer)}
+      if(document.body.contains(ov))draw(ov,close);
+    }
+  };
+  modal('',draw);
+}
+
 /* ---------- cloud sync (Supabase realtime) ---------- */
 const TABLE='schedule_docs',SUPA_CDN='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js';
 let cloud=null,pushTimer=null;const remoteQ=[];
@@ -906,7 +1017,7 @@ document.addEventListener('focusout',()=>setTimeout(tryFlush,0));
 function loadScript(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error('โหลดไลบรารีไม่ได้'));document.head.appendChild(s)})}
 async function initCloud(){
   let cfg;
-  try{const r=await fetch('/api/config',{cache:'no-store'});if(!r.ok)return;cfg=await r.json()}catch(e){return}
+  try{const r=await fetch('/api/config',{cache:'no-store'});if(!r.ok)return;cfg=await r.json();apiCfg={ai:cfg.ai!==false}}catch(e){return}
   if(!cfg||!cfg.url||!cfg.anonKey)return;
   setSync('connecting');
   try{

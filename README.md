@@ -8,6 +8,7 @@
 | ไฟล์ | ใช้ทำอะไร |
 | --- | --- |
 | `index.html` | ตัวเว็บทั้งหมด |
+| `api/extract.js` | ส่งรูปตารางไปให้ Claude อ่าน แล้วส่งวิชาและตารางสอบกลับมา |
 | `api/config.js` | ส่งค่า Supabase URL / anon key จาก Environment Variables ของ Vercel ให้หน้าเว็บ |
 | `supabase/schema.sql` | สร้างตารางในฐานข้อมูล เปิดสิทธิ์ และเปิด realtime |
 
@@ -23,6 +24,14 @@ URL และ publishable key ใส่ไว้ใน `api/config.js` แล้
 1. เข้า https://vercel.com/new แล้ว **Import** repo `oven-ttta/class`
 2. Framework Preset: **Other** ไม่ต้องตั้ง Build Command และไม่ต้องใส่ Environment Variables
 3. กด **Deploy**
+
+### 3. ระบบอัปโหลดรูปตาราง (AI กรอกให้)
+1. สร้าง API key ที่ https://platform.claude.com/settings/keys
+2. ใน Vercel → Project → **Settings → Environment Variables** เพิ่ม `ANTHROPIC_API_KEY` = key ที่ได้
+3. กด **Redeploy**
+
+จากนั้นกดปุ่ม “อัปโหลดรูปตาราง (AI กรอกให้)” ใส่ชื่อ เลือกรูปหน้าตารางเรียน/สอบ (สูงสุด 4 รูป) แล้วตรวจข้อมูลก่อนบันทึก
+ค่าใช้จ่ายคิดตามการใช้งาน API ของ Anthropic (ประมาณ 1–3 บาทต่อการอ่านหนึ่งครั้ง ขึ้นกับจำนวนรูป)
 
 เปิดเว็บแล้วป้ายด้านบนจะเป็นสีเขียว “ออนไลน์ · อัปเดตเรียลไทม์”
 ครั้งแรกที่เปิด เว็บจะใส่ข้อมูลตัวอย่างลงฐานข้อมูลให้เอง
