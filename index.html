@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>สมุดตารางเรียน</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@500;600;700&family=Sarabun:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: registrar-style timetable sheet; person tabs on top, editable profile, day×hour grid, exam table below */
+:root{
+  --bg:#eef0f5; --surface:#ffffff; --ink:#1d2230; --muted:#5b6274; --line:#d6dae4; --cell:#ebecf0;
+  --head:#45484f; --head-ink:#ffffff; --day:#9b9ea6; --weekend:#a8433f; --accent:#2c5bcc; --teal:#2a7a70;
+  --b-blue:#c3cbf7; --b-rose:#f0a3a3; --b-green:#bfe2c8; --b-amber:#f4d898; --b-violet:#dcc7f2; --b-ink:#1b2133;
+  --danger:#b3261e; --shadow:0 1px 2px rgba(20,30,60,.08),0 6px 20px rgba(20,30,60,.06);
+  --f-display:"Anuphan","Sarabun",system-ui,sans-serif; --f-body:"Sarabun",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+  --daycol:86px; --slot:34px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#13151b; --surface:#1b1e26; --ink:#e7e9f0; --muted:#a2a8b8; --line:#30343f; --cell:#21242d;
+  --head:#0d0f14; --head-ink:#e7e9f0; --day:#3b3f49; --weekend:#86403c; --accent:#93b2ff; --teal:#1f5d55;
+  --b-blue:#36427c; --b-rose:#7b3b40; --b-green:#2f5d3e; --b-amber:#6d5626; --b-violet:#54417b; --b-ink:#eef0fa;
+  --danger:#ff8a80; --shadow:0 1px 2px rgba(0,0,0,.4); color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#13151b; --surface:#1b1e26; --ink:#e7e9f0; --muted:#a2a8b8; --line:#30343f; --cell:#21242d;
+  --head:#0d0f14; --head-ink:#e7e9f0; --day:#3b3f49; --weekend:#86403c; --accent:#93b2ff; --teal:#1f5d55;
+  --b-blue:#36427c; --b-rose:#7b3b40; --b-green:#2f5d3e; --b-amber:#6d5626; --b-violet:#54417b; --b-ink:#eef0fa;
+  --danger:#ff8a80; --shadow:0 1px 2px rgba(0,0,0,.4); color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1180px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:18px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.top h1{font-size:1.5rem;font-weight:700}
+.top p{margin:0;color:var(--muted);font-size:.9rem}
+
+.people{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-weight:500}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip.add{border-style:dashed;color:var(--muted)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow)}
+.sheet{padding:18px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.sheet-title{font-family:var(--f-display);color:var(--accent);font-size:1.15rem;font-weight:700}
+.profile{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;align-items:center}
+.profile label{color:var(--muted);font-size:.85rem}
+.field{border:1px solid transparent;background:transparent;border-radius:6px;padding:3px 8px;width:100%;min-width:0}
+.field:hover{border-color:var(--line)}
+.field:focus{border-color:var(--accent);background:var(--bg);outline:none}
+.field.name{font-family:var(--f-display);font-size:1.35rem;font-weight:700}
+.hint{font-size:.78rem;color:var(--muted)}
+
+.bar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+.bar .grp{display:flex;align-items:center;gap:6px}
+.bar .lbl{color:var(--weekend);font-family:var(--f-display);font-weight:600}
+.small{border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:4px 8px}
+.year{width:5.5em;font-variant-numeric:tabular-nums}
+.term{width:3.5em}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 12px;font-weight:500}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.btn.danger{color:var(--danger)}
+.btn.danger.armed{background:var(--danger);color:var(--surface);border-color:var(--danger)}
+.spacer{flex:1}
+
+.scroll{overflow-x:auto;border-radius:6px}
+.grid{display:grid;gap:2px;background:var(--surface);min-width:640px;font-variant-numeric:tabular-nums}
+.gh{background:var(--head);color:var(--head-ink);font-size:.78rem;font-weight:600;display:flex;align-items:center;justify-content:center;text-align:center;padding:8px 2px;line-height:1.2}
+.gd{background:var(--day);color:var(--head-ink);font-family:var(--f-display);font-weight:600;display:flex;align-items:center;justify-content:center;font-size:.9rem;padding:4px}
+.gd.weekend{background:var(--weekend)}
+.ge{background:var(--cell);min-height:56px;border:0;padding:0}
+.ge:hover{background:color-mix(in srgb,var(--accent) 14%,var(--cell))}
+.gc{border:0;text-align:center;padding:4px 6px;color:var(--b-ink);display:flex;flex-direction:column;justify-content:center;align-items:center;line-height:1.3;font-size:.74rem;min-height:56px;z-index:1;min-width:0;overflow:hidden}
+.gc:hover{filter:brightness(.96)}
+.gc .code{font-family:var(--f-mono);color:var(--accent);font-size:.72rem}
+.gc.big{font-size:.95rem}
+.gc.big .code{font-size:.95rem;font-weight:700}
+.gc[data-c="blue"]{background:var(--b-blue)} .gc[data-c="rose"]{background:var(--b-rose)}
+.gc[data-c="green"]{background:var(--b-green)} .gc[data-c="amber"]{background:var(--b-amber)}
+.gc[data-c="violet"]{background:var(--b-violet)}
+.gc .cn{opacity:.8;font-size:.92em}
+.note{font-size:.82rem;color:var(--muted)}
+.warn{font-size:.85rem;color:var(--weekend)}
+
+.exam-h{background:var(--teal);color:#fff;text-align:center;padding:8px;font-family:var(--f-display);font-weight:700;font-size:1.1rem;border-radius:6px 6px 0 0}
+table{border-collapse:collapse;width:100%;min-width:620px}
+th{color:var(--accent);font-family:var(--f-display);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;font-size:.9rem}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top;font-size:.88rem}
+tr.er{cursor:pointer} tr.er:hover td{background:var(--cell)}
+td.code{font-family:var(--f-mono);white-space:nowrap;font-size:.82rem}
+td.when{white-space:pre-line;font-size:.78rem;color:var(--muted);text-align:center}
+td .th{color:var(--muted)}
+.legend{font-size:.82rem;color:var(--muted)}
+
+.tools{padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.tools h3{font-size:1rem}
+textarea.data{width:100%;min-height:110px;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:8px;font-family:var(--f-mono);font-size:.75rem}
+
+.ov{position:fixed;inset:0;background:rgba(10,14,25,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
+.modal{width:min(520px,100%);max-height:calc(100% - 32px);overflow:auto;padding:20px;display:flex;flex-direction:column;gap:14px}
+.modal h2{font-size:1.15rem}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.form .full{grid-column:1/-1}
+.form label{display:flex;flex-direction:column;gap:3px;font-size:.82rem;color:var(--muted);min-width:0}
+.form input,.form select,.form textarea{border:1px solid var(--line);border-radius:6px;background:var(--bg);padding:6px 8px;color:var(--ink);font-size:.95rem;width:100%}
+.sw{display:flex;gap:8px;flex-wrap:wrap}
+.sw input{position:absolute;opacity:0;width:1px;height:1px}
+.sw span{display:block;width:30px;height:30px;border-radius:50%;border:2px solid var(--line)}
+.sw input:checked+span{border-color:var(--ink);box-shadow:0 0 0 2px var(--surface) inset}
+.sw input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.daylist{display:flex;flex-direction:column;gap:6px}
+.dayrow{display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid var(--line);border-radius:8px}
+.dayrow span{flex:1;font-weight:500}
+.ib{border:1px solid var(--line);background:var(--surface);border-radius:6px;width:30px;height:30px;line-height:1}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:.9rem;z-index:60}
+@media (max-width:560px){
+  .profile{grid-template-columns:1fr}
+  .profile label{margin-top:6px}
+  .form{grid-template-columns:1fr}
+  :root{--daycol:64px;--slot:30px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <h1>สมุดตารางเรียน</h1>
+    <p>เก็บตารางเรียนของแต่ละคน แตะช่องว่างเพื่อเพิ่มวิชา แตะวิชาเพื่อแก้ไข</p>
+  </div>
+
+  <nav class="people" id="people" aria-label="เลือกเจ้าของตารางเรียน"></nav>
+
+  <section class="card sheet" id="sheet"></section>
+
+  <section class="card sheet" id="exams"></section>
+
+  <section class="card tools">
+    <h3>สำรอง / ย้ายข้อมูล</h3>
+    <p class="note" style="margin:0">ข้อมูลบันทึกไว้ในเบราว์เซอร์เครื่องนี้อัตโนมัติ ถ้าจะย้ายเครื่องหรือส่งให้เพื่อน ให้คัดลอกข้อมูลไปวางในช่องนำเข้าอีกเครื่อง</p>
+    <div class="bar">
+      <button class="btn" id="bExpOne">คัดลอกข้อมูลคนนี้</button>
+      <button class="btn" id="bExpAll">คัดลอกข้อมูลทุกคน</button>
+      <button class="btn" id="bImport">นำเข้าจากข้อความที่วาง</button>
+      <span class="spacer"></span>
+      <button class="btn" id="bDup">ทำสำเนาตารางนี้</button>
+      <button class="btn danger" id="bDel">ลบตารางของคนนี้</button>
+    </div>
+    <textarea class="data" id="dataBox" placeholder="ข้อมูลที่คัดลอกจะแสดงที่นี่ หรือวางข้อมูลที่ต้องการนำเข้าแล้วกด “นำเข้าจากข้อความที่วาง”"></textarea>
+  </section>
+</div>
+<div id="modalRoot"></div>
+
+<script>
+const KEY='class-schedules-v1';
+const ALL_DAYS=['จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์','อาทิตย์'];
+const WEEKEND=['เสาร์','อาทิตย์'];
+const COLORS=[['blue','ฟ้า'],['rose','ชมพู'],['green','เขียว'],['amber','เหลือง'],['violet','ม่วง']];
+const uid=()=>Math.random().toString(36).slice(2,10);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const toMin=t=>{const [h,m]=String(t||'0:0').split(':').map(Number);return (h||0)*60+(m||0)};
+const pad=n=>String(n).padStart(2,'0');
+
+/* ---------- sample data (from the four timetables) ---------- */
+function C(day,start,end,code,group,room,dates,color){return {id:uid(),day,start,end,code,group,room,dates:dates||'',color:color||'blue'}}
+function E(code,nameEn,nameTh,group,mid,fin){return {id:uid(),code,nameEn,nameTh,group,mid:mid||'-',final:fin||'-'}}
+const R1='19/10/2569-17/1/2570', RA='7/12/2569-17/1/2570', RB='19/10/2569-29/11/2569';
+const PROFILE={status:'กำลังศึกษา',faculty:'สำนักวิชาศาสตร์และศิลป์ดิจิทัล',program:'วิทยาการสารสนเทศบัณฑิต (เทคโนโลยีดิจิทัล) - 2568',advisor:'',year:'2569',term:'2'};
+const Y1EX=g=>[
+  E('DGT01 0210-1','EMERGING DIGITAL TECHNOLOGY','เทคโนโลยีดิจิทัลอุบัติใหม่',g[0],'(C) 30 พ.ย. 2569\nเวลา 09:00-11:00','(C) 18 ม.ค. 2570\nเวลา 13:00-16:00'),
+  E('DGT01 0220-1','ARTIFICIAL INTELLIGENCE FUNDAMENTALS','พื้นฐานปัญญาประดิษฐ์',g[1],'(C) 1 ธ.ค. 2569\nเวลา 12:00-14:00','(C) 19 ม.ค. 2570\nเวลา 13:00-16:00'),
+  E('DGT01 0310-1','DATABASE DESIGN AND DEVELOPMENT FUNDAMENTALS','พื้นฐานการออกแบบและพัฒนาฐานข้อมูล',g[2],'(C) 2 ธ.ค. 2569\nเวลา 15:00-17:00','(C) 20 ม.ค. 2570\nเวลา 13:00-16:00'),
+  E('DGT01 0320-1','SOFTWARE DEVELOPMENT FUNDAMENTALS','พื้นฐานการพัฒนาซอฟต์แวร์',g[3],'(C) 3 ธ.ค. 2569\nเวลา 15:00-17:00','(C) 25 ม.ค. 2570\nเวลา 13:00-16:00'),
+  E('DGT01 0330-1','WEB DEVELOPMENT FUNDAMENTALS','พื้นฐานการพัฒนาเว็บ',g[4],'(C) 4 ธ.ค. 2569\nเวลา 09:00-11:00','(C) 26 ม.ค. 2570\nเวลา 09:00-12:00'),
+];
+const IST1102=g=>E('IST30 1102-1','ENGLISH FOR COMMUNICATION 2','ภาษาอังกฤษเพื่อการสื่อสาร 2',g,'(C) 30 พ.ย. 2569\nเวลา 17:30-19:30','(C) 22 ม.ค. 2570\nเวลา 13:00-16:00');
+function person(name,extra){return Object.assign({id:uid(),name,...PROFILE,startHour:9,endHour:17,days:ALL_DAYS.slice(0,5),classes:[],exams:[]},extra)}
+function seed(){
+  const a=person('ตัวอย่าง: ปี 2 สาย .NET',{startHour:8,days:ALL_DAYS.slice(0,6),classes:[
+    C('อังคาร','08:00','12:00','DGT01 2420','1','DIGITAL TECH LAB 14',RA,'blue'),
+    C('อังคาร','08:00','12:00','DGT01 2410','1','DIGITAL TECH LAB 14',RB,'rose'),
+    C('อังคาร','13:00','17:00','DGT01 2420','1','DIGITAL TECH LAB 14',RA,'blue'),
+    C('อังคาร','13:00','17:00','DGT01 2410','1','DIGITAL TECH LAB 14',RB,'rose'),
+    C('พุธ','13:00','17:00','DGT01 2120','2','DIGITAL TECH LAB 11',RA,'blue'),
+    C('พุธ','13:00','17:00','DGT01 2110','2','DIGITAL TECH LAB 11',RB,'rose'),
+    C('พฤหัสบดี','08:00','11:00','IST30 1105','16','B1118','','blue'),
+    C('พฤหัสบดี','13:00','15:00','DGT01 2130','1','B6104-A',R1,'blue'),
+    C('พฤหัสบดี','15:00','17:00','DGT01 2430','1','B6105-A',R1,'blue'),
+    C('ศุกร์','08:00','12:00','DGT01 2120','2','DIGITAL TECH LAB 11',RA,'blue'),
+    C('ศุกร์','08:00','12:00','DGT01 2110','2','DIGITAL TECH LAB 11',RB,'rose'),
+    C('เสาร์','08:00','12:00','DGT01 2130','1','B6102-A',R1,'blue'),
+    C('เสาร์','13:00','17:00','DGT01 2430','1','B6105-A',R1,'blue'),
+  ],exams:[
+    E('DGT01 2110-1','WEB USER INTERFACE DEVELOPMENT','การพัฒนาส่วนต่อประสานกับผู้ใช้ของเว็บ','2','(C) 30 พ.ย. 2569\nเวลา 09:00-11:00','(C) 26 ม.ค. 2570\nเวลา 09:00-12:00'),
+    E('DGT01 2120-1','MOBILE USER INTERFACE DEVELOPMENT','การพัฒนาส่วนต่อประสานกับผู้ใช้ของอุปกรณ์เคลื่อนที่','2','(C) 1 ธ.ค. 2569\nเวลา 15:00-17:00','(C) 26 ม.ค. 2570\nเวลา 13:00-16:00'),
+    E('DGT01 2130-1','PROJECT IN USER INTERFACE DEVELOPMENT','โครงงานการพัฒนาส่วนต่อประสานกับผู้ใช้','1'),
+    E('DGT01 2410-1','FRONT-END APPLICATION DEVELOPMENT WITH .NET FRAMEWORK','การพัฒนาโปรแกรมประยุกต์ในส่วนติดต่อผู้ใช้ด้วยดอทเน็ตเฟรมเวิร์ค','1'),
+    E('DGT01 2420-1','BACK-END APPLICATION DEVELOPMENT WITH .NET FRAMEWORK','การพัฒนาโปรแกรมประยุกต์ในส่วนการจัดการระบบด้วยดอทเน็ตเฟรมเวิร์ค','1','-','(C) 22 ม.ค. 2570\nเวลา 09:00-12:00'),
+    E('DGT01 2430-1','PROJECT IN FULL STACK APPLICATION DEVELOPMENT WITH .NET FRAMEWORK','โครงงานการพัฒนาโปรแกรมประยุกต์เต็มรูปแบบของดอทเน็ตเฟรมเวิร์ค','1'),
+    E('IST30 1105-1','ENGLISH FOR CAREERS','ภาษาอังกฤษเพื่อการทำงาน','16','-','(C) 20 ม.ค. 2570\nเวลา 16:30-19:30'),
+  ]});
+  const b=person('อัจฉรียา พุทธโคตร',{advisor:'ผู้ช่วยศาสตราจารย์ ดร.ฉัตรภัสร์ ฐิติอัครวงศ์',classes:[
+    C('จันทร์','09:00','12:00','DGT01 0210','1','B6501-A',R1),
+    C('จันทร์','13:00','15:00','DGT01 0310','2','B6502-A',R1),
+    C('อังคาร','10:00','12:00','DGT01 0310','2','DIGITAL TECH LAB 11',R1),
+    C('พุธ','09:00','12:00','DGT01 0330','2','DIGITAL TECH LAB 13',R1),
+    C('พุธ','13:00','15:00','DGT01 0320','3','B2101',R1),
+    C('พฤหัสบดี','09:00','12:00','IST30 1102','12','B6101-A',''),
+    C('พฤหัสบดี','13:00','17:00','DGT01 0220','5','DIGITAL TECH LAB 14',R1),
+    C('ศุกร์','13:00','15:00','DGT01 0320','3','DIGITAL TECH LAB 13',R1),
+  ],exams:[...Y1EX(['1','5','2','3','2']),IST1102('12')]});
+  const g1=()=>[
+    C('จันทร์','09:00','12:00','DGT01 0210','1','B6501-A',R1),
+    C('จันทร์','13:00','15:00','DGT01 0310','1','B6503-A',R1),
+    C('อังคาร','10:00','12:00','DGT01 0310','1','DIGITAL TECH LAB 10',R1),
+    C('พุธ','09:00','12:00','DGT01 0330','1','DIGITAL TECH LAB 11',R1),
+    C('พุธ','13:00','15:00','DGT01 0320','1','B6503-A',R1),
+    C('พฤหัสบดี','13:00','17:00','DGT01 0220','1','DIGITAL TECH LAB 10',R1),
+    C('ศุกร์','13:00','15:00','DGT01 0320','1','DIGITAL TECH LAB 11',R1),
+  ];
+  const c=person('ตัวอย่าง: ปี 1 กลุ่ม 1',{classes:g1(),exams:Y1EX(['1','1','1','1','1'])});
+  const d=person('ตัวอย่าง: ปี 1 กลุ่ม 1 + อังกฤษ กลุ่ม 10',{classes:[...g1(),C('พฤหัสบดี','09:00','12:00','IST30 1102','10','B1141','')],exams:[...Y1EX(['1','1','1','1','1']),IST1102('10')]});
+  return {people:[b,a,c,d],currentId:b.id};
+}
+
+/* ---------- storage ---------- */
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.people)&&s.people.length)return s}catch(e){}return null}
+let state=load()||seed();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+const cur=()=>state.people.find(p=>p.id===state.currentId)||state.people[0];
+function commit(){save();render()}
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
+
+/* ---------- render ---------- */
+function render(){renderPeople();renderSheet();renderExams()}
+function renderPeople(){
+  const el=document.getElementById('people');
+  el.innerHTML=state.people.map(p=>`<button class="chip" data-id="${p.id}" aria-pressed="${p.id===cur().id}">${esc(p.name||'(ไม่มีชื่อ)')}</button>`).join('')+
+    `<button class="chip add" id="addPerson">+ เพิ่มคน</button>`;
+  el.querySelectorAll('[data-id]').forEach(b=>b.onclick=()=>{state.currentId=b.dataset.id;commit()});
+  document.getElementById('addPerson').onclick=()=>{const p=person('คนใหม่',{advisor:''});state.people.push(p);state.currentId=p.id;commit();
+    setTimeout(()=>{const f=document.getElementById('f-name');f&&(f.focus(),f.select())},0)};
+}
+function hourOpts(sel,from,to){let s='';for(let h=from;h<=to;h++)s+=`<option value="${h}"${h===sel?' selected':''}>${pad(h)}:00</option>`;return s}
+function renderSheet(){
+  const p=cur(),el=document.getElementById('sheet');
+  const F=(k,label,cls='')=>`<label for="f-${k}">${label}</label><input class="field ${cls}" id="f-${k}" data-k="${k}" value="${esc(p[k])}" placeholder="—">`;
+  el.innerHTML=`
+    <div class="sheet-title">ตารางเรียน/สอบของรายวิชาที่ลงทะเบียนไว้แล้ว</div>
+    <div class="profile">
+      ${F('name','ชื่อ','name')}${F('status','สถานภาพ')}${F('faculty','สำนักวิชา')}${F('program','หลักสูตร')}${F('advisor','อ. ที่ปรึกษา')}
+    </div>
+    <div class="bar">
+      <div class="grp"><span class="lbl">ปีการศึกษา :</span>
+        <input class="small year" id="f-year" data-k="year" value="${esc(p.year)}" aria-label="ปีการศึกษา"> /
+        <input class="small term" id="f-term" data-k="term" value="${esc(p.term)}" aria-label="ภาคการศึกษา"></div>
+      <div class="grp"><span class="note">เวลา</span>
+        <select class="small" id="f-sh" aria-label="เริ่ม">${hourOpts(p.startHour,6,20)}</select>–
+        <select class="small" id="f-eh" aria-label="สิ้นสุด">${hourOpts(p.endHour,7,22)}</select></div>
+      <span class="spacer"></span>
+      <button class="btn" id="bDays">จัดการวัน</button>
+      <button class="btn primary" id="bAddClass">+ เพิ่มวิชาในตาราง</button>
+    </div>
+    <div class="scroll"><div class="grid" id="grid"></div></div>
+    <div id="hidden"></div>
+    <div class="note">* ข้อมูลในตารางเรียนประกอบด้วย รหัสวิชา, กลุ่ม, ห้องเรียนและอาคาร, ช่วงวันที่ (เวลา) ตามลำดับ</div>`;
+  el.querySelectorAll('[data-k]').forEach(i=>i.oninput=()=>{p[i.dataset.k]=i.value;save();if(i.dataset.k==='name')renderPeople()});
+  const sh=el.querySelector('#f-sh'),eh=el.querySelector('#f-eh');
+  sh.onchange=()=>{p.startHour=+sh.value;if(p.endHour<=p.startHour)p.endHour=p.startHour+1;commit()};
+  eh.onchange=()=>{p.endHour=+eh.value;if(p.endHour<=p.startHour)p.startHour=p.endHour-1;commit()};
+  el.querySelector('#bDays').onclick=openDays;
+  el.querySelector('#bAddClass').onclick=()=>openClass(null,{day:p.days[0]||'จันทร์',start:pad(p.startHour)+':00',end:pad(Math.min(p.startHour+3,p.endHour))+':00'});
+  renderGrid(p);
+}
+function courseName(p,code){const e=p.exams.find(x=>x.code.replace(/-\d+$/,'').trim()===code.trim());return e?(e.nameTh||e.nameEn):''}
+function renderGrid(p){
+  const g=document.getElementById('grid'),hours=p.endHour-p.startHour,slots=hours*2,base=p.startHour*60;
+  g.style.gridTemplateColumns=`var(--daycol) repeat(${slots},minmax(var(--slot),1fr))`;
+  let h=`<div class="gh" style="grid-row:1;grid-column:1">Day/Time</div>`;
+  for(let i=0;i<hours;i++)h+=`<div class="gh" style="grid-row:1;grid-column:${2+i*2}/span 2">${pad(p.startHour+i)}:00-${pad(p.startHour+i+1)}:00</div>`;
+  let row=2;
+  p.days.forEach(day=>{
+    const list=p.classes.filter(c=>c.day===day).sort((a,b)=>toMin(a.start)-toMin(b.start));
+    const lanes=[];const placed=[];
+    list.forEach(c=>{const s=toMin(c.start),e=toMin(c.end);let l=lanes.findIndex(end=>end<=s);if(l<0){l=lanes.length;lanes.push(e)}else lanes[l]=e;placed.push([c,l])});
+    const n=Math.max(1,lanes.length);
+    h+=`<div class="gd${WEEKEND.includes(day)?' weekend':''}" style="grid-row:${row}/span ${n};grid-column:1">${esc(day)}</div>`;
+    for(let l=0;l<n;l++)for(let i=0;i<hours;i++)
+      h+=`<button class="ge" style="grid-row:${row+l};grid-column:${2+i*2}/span 2" data-day="${esc(day)}" data-h="${p.startHour+i}" aria-label="เพิ่มวิชา ${esc(day)} ${pad(p.startHour+i)}:00"></button>`;
+    placed.forEach(([c,l])=>{
+      let s=Math.round((toMin(c.start)-base)/30),e=Math.round((toMin(c.end)-base)/30);
+      s=Math.max(0,s);e=Math.min(slots,e);if(e<=s)return;
+      const span=e-s,big=span>=8,nm=courseName(p,c.code);
+      const tm=`(${esc(c.start)}-${esc(c.end)})`;
+      h+=`<button class="gc${big?' big':''}" data-c="${esc(c.color)}" data-cid="${c.id}" style="grid-row:${row+l};grid-column:${2+s}/span ${span}" title="${esc(nm)}">
+        <span><span class="code">${esc(c.code)}</span>${c.group?', '+esc(c.group):''}</span>
+        ${c.room?`<span>${esc(c.room)}</span>`:''}
+        <span>${c.dates?esc(c.dates)+' ':''}${tm}</span></button>`;
+    });
+    row+=n;
+  });
+  g.innerHTML=h;
+  g.querySelectorAll('.ge').forEach(b=>b.onclick=()=>{const hh=+b.dataset.h;openClass(null,{day:b.dataset.day,start:pad(hh)+':00',end:pad(Math.min(hh+2,p.endHour))+':00'})});
+  g.querySelectorAll('.gc').forEach(b=>b.onclick=()=>openClass(p.classes.find(c=>c.id===b.dataset.cid)));
+  const outside=p.classes.filter(c=>!p.days.includes(c.day)||toMin(c.start)<base||toMin(c.end)>p.endHour*60);
+  document.getElementById('hidden').innerHTML=outside.length?`<div class="warn">มี ${outside.length} วิชาที่อยู่นอกวันหรือช่วงเวลาที่แสดง: ${outside.map(c=>`${esc(c.code)} (${esc(c.day)} ${esc(c.start)}-${esc(c.end)})`).join(', ')} — เพิ่มวันหรือขยายช่วงเวลาเพื่อให้เห็นครบ</div>`:'';
+}
+function renderExams(){
+  const p=cur(),el=document.getElementById('exams');
+  el.innerHTML=`<div><div class="exam-h">ตารางสอบ</div>
+    <div class="scroll"><table><thead><tr><th>รหัสวิชา</th><th>ชื่อรายวิชา</th><th>กลุ่ม</th><th style="text-align:center">สอบกลางภาค</th><th style="text-align:center">สอบประจำภาค</th></tr></thead>
+    <tbody>${p.exams.map(e=>`<tr class="er" data-eid="${e.id}" tabindex="0"><td class="code">${esc(e.code)}</td><td>${esc(e.nameEn)}<br><span class="th">${esc(e.nameTh)}</span></td><td>${esc(e.group)}</td><td class="when">${esc(e.mid)}</td><td class="when">${esc(e.final)}</td></tr>`).join('')||
+      `<tr><td colspan="5" class="note">ยังไม่มีวิชาในตารางสอบ กด “เพิ่มวิชาในตารางสอบ” เพื่อเริ่ม</td></tr>`}</tbody></table></div></div>
+    <div class="bar"><span class="legend">หมายเหตุ C = Lecture L = Lab P = โครงงาน R = ประชุม S = Self Study T = ติว</span><span class="spacer"></span><button class="btn primary" id="bAddExam">+ เพิ่มวิชาในตารางสอบ</button></div>`;
+  el.querySelectorAll('tr.er').forEach(r=>{const o=()=>openExam(p.exams.find(e=>e.id===r.dataset.eid));r.onclick=o;r.onkeydown=ev=>{if(ev.key==='Enter')o()}});
+  el.querySelector('#bAddExam').onclick=()=>openExam(null);
+}
+
+/* ---------- modals ---------- */
+function modal(html,bind){
+  const root=document.getElementById('modalRoot');
+  root.innerHTML=`<div class="ov"><div class="card modal" role="dialog" aria-modal="true">${html}</div></div>`;
+  const ov=root.firstChild,close=()=>{root.innerHTML='';document.removeEventListener('keydown',esc_)};
+  const esc_=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',esc_);
+  ov.onclick=e=>{if(e.target===ov)close()};
+  bind(ov,close);
+  const f=ov.querySelector('input,select,textarea');f&&f.focus();
+}
+function armDelete(btn,fn){btn.onclick=()=>{if(btn.classList.contains('armed'))fn();else{btn.classList.add('armed');btn.textContent='กดอีกครั้งเพื่อยืนยันลบ';setTimeout(()=>{btn.classList.remove('armed');btn.textContent='ลบ'},3000)}}}
+function openClass(c,preset){
+  const p=cur(),isNew=!c,d=c||Object.assign({code:'',group:'',room:'',dates:'',color:'blue'},preset);
+  const days=[...new Set([...p.days,d.day])];
+  modal(`<h2>${isNew?'เพิ่มวิชาในตาราง':'แก้ไขวิชา'}</h2>
+    <form class="form" id="cf">
+      <label>รหัสวิชา<input id="c-code" value="${esc(d.code)}" placeholder="DGT01 0210" required></label>
+      <label>กลุ่ม<input id="c-group" value="${esc(d.group)}" placeholder="1"></label>
+      <label>วัน<select id="c-day">${days.map(x=>`<option${x===d.day?' selected':''}>${esc(x)}</option>`).join('')}</select></label>
+      <label>ห้องเรียน / อาคาร<input id="c-room" value="${esc(d.room)}" placeholder="B6501-A"></label>
+      <label>เริ่ม<input type="time" id="c-start" step="1800" value="${esc(d.start)}" required></label>
+      <label>สิ้นสุด<input type="time" id="c-end" step="1800" value="${esc(d.end)}" required></label>
+      <label class="full">ช่วงวันที่เรียน (ไม่ใส่ก็ได้)<input id="c-dates" value="${esc(d.dates)}" placeholder="19/10/2569-17/1/2570"></label>
+      <div class="full"><div class="note" style="margin-bottom:4px">สีช่อง</div><div class="sw">${COLORS.map(([k,n])=>`<label title="${n}"><input type="radio" name="c-color" value="${k}"${k===d.color?' checked':''} aria-label="${n}"><span style="background:var(--b-${k})"></span></label>`).join('')}</div></div>
+      <div class="warn full" id="c-err" hidden></div>
+      <div class="actions full">${isNew?'':'<button type="button" class="btn danger" id="c-del">ลบ</button><span class="spacer"></span>'}
+        <button type="button" class="btn" id="c-cancel">ยกเลิก</button><button class="btn primary">บันทึก</button></div>
+    </form>`,(ov,close)=>{
+    ov.querySelector('#c-cancel').onclick=close;
+    const del=ov.querySelector('#c-del');del&&armDelete(del,()=>{p.classes=p.classes.filter(x=>x.id!==c.id);close();commit();toast('ลบวิชาแล้ว')});
+    ov.querySelector('#cf').onsubmit=e=>{e.preventDefault();
+      const v=id=>ov.querySelector('#c-'+id).value.trim();
+      const err=ov.querySelector('#c-err');
+      if(toMin(v('end'))<=toMin(v('start'))){err.hidden=false;err.textContent='เวลาสิ้นสุดต้องหลังเวลาเริ่ม';return}
+      const o={day:v('day'),start:v('start'),end:v('end'),code:v('code'),group:v('group'),room:v('room'),dates:v('dates'),color:(ov.querySelector('[name=c-color]:checked')||{}).value||'blue'};
+      if(isNew)p.classes.push({id:uid(),...o});else Object.assign(c,o);
+      if(toMin(o.start)<p.startHour*60)p.startHour=Math.floor(toMin(o.start)/60);
+      if(toMin(o.end)>p.endHour*60)p.endHour=Math.ceil(toMin(o.end)/60);
+      close();commit();toast(isNew?'เพิ่มวิชาแล้ว':'บันทึกแล้ว')};
+  });
+}
+function openExam(e){
+  const p=cur(),isNew=!e,d=e||{code:'',nameEn:'',nameTh:'',group:'',mid:'-',final:'-'};
+  modal(`<h2>${isNew?'เพิ่มวิชาในตารางสอบ':'แก้ไขตารางสอบ'}</h2>
+    <form class="form" id="ef">
+      <label>รหัสวิชา<input id="e-code" value="${esc(d.code)}" placeholder="DGT01 0210-1" required></label>
+      <label>กลุ่ม<input id="e-group" value="${esc(d.group)}"></label>
+      <label class="full">ชื่อรายวิชา (อังกฤษ)<input id="e-nameEn" value="${esc(d.nameEn)}"></label>
+      <label class="full">ชื่อรายวิชา (ไทย)<input id="e-nameTh" value="${esc(d.nameTh)}"></label>
+      <label>สอบกลางภาค<textarea id="e-mid" rows="3">${esc(d.mid)}</textarea></label>
+      <label>สอบประจำภาค<textarea id="e-final" rows="3">${esc(d.final)}</textarea></label>
+      <div class="actions full">${isNew?'':'<button type="button" class="btn danger" id="e-del">ลบ</button><span class="spacer"></span>'}
+        <button type="button" class="btn" id="e-cancel">ยกเลิก</button><button class="btn primary">บันทึก</button></div>
+    </form>`,(ov,close)=>{
+    ov.querySelector('#e-cancel').onclick=close;
+    const del=ov.querySelector('#e-del');del&&armDelete(del,()=>{p.exams=p.exams.filter(x=>x.id!==e.id);close();commit();toast('ลบแล้ว')});
+    ov.querySelector('#ef').onsubmit=ev=>{ev.preventDefault();
+      const v=id=>ov.querySelector('#e-'+id).value.trim();
+      const o={code:v('code'),group:v('group'),nameEn:v('nameEn'),nameTh:v('nameTh'),mid:v('mid')||'-',final:v('final')||'-'};
+      if(isNew)p.exams.push({id:uid(),...o});else Object.assign(e,o);
+      close();commit();toast('บันทึกแล้ว')};
+  });
+}
+function openDays(){
+  const p=cur();
+  const draw=(ov,close)=>{
+    const rest=ALL_DAYS.filter(x=>!p.days.includes(x));
+    ov.querySelector('.modal').innerHTML=`<h2>จัดการวัน</h2>
+      <div class="daylist">${p.days.map((d,i)=>{const n=p.classes.filter(c=>c.day===d).length;return `<div class="dayrow"><span>${esc(d)} <span class="note">${n?n+' วิชา':''}</span></span>
+        <button class="ib" data-up="${i}" aria-label="เลื่อนขึ้น"${i?'':' disabled'}>↑</button><button class="ib" data-dn="${i}" aria-label="เลื่อนลง"${i<p.days.length-1?'':' disabled'}>↓</button><button class="ib" data-rm="${i}" aria-label="เอาวัน ${esc(d)} ออก">✕</button></div>`}).join('')||'<div class="note">ยังไม่มีวัน</div>'}</div>
+      <div class="note">เอาวันออกแล้ววิชาในวันนั้นจะยังเก็บไว้ เพิ่มวันกลับมาก็จะแสดงอีกครั้ง</div>
+      <div class="form">
+        <label>เพิ่มวัน<select id="d-pick">${rest.map(x=>`<option>${x}</option>`).join('')}<option value="__custom">อื่น ๆ (พิมพ์เอง)</option></select></label>
+        <label>ชื่อวัน (ถ้าเลือก “อื่น ๆ”)<input id="d-custom" placeholder="เช่น สอบเก็บคะแนน"></label>
+      </div>
+      <div class="actions"><button class="btn primary" id="d-add">+ เพิ่มวัน</button><button class="btn" id="d-close">เสร็จ</button></div>`;
+    const re=()=>{commit();draw(ov,close)};
+    ov.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{const i=+b.dataset.up;[p.days[i-1],p.days[i]]=[p.days[i],p.days[i-1]];re()});
+    ov.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>{const i=+b.dataset.dn;[p.days[i+1],p.days[i]]=[p.days[i],p.days[i+1]];re()});
+    ov.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{p.days.splice(+b.dataset.rm,1);re()});
+    ov.querySelector('#d-add').onclick=()=>{const s=ov.querySelector('#d-pick').value;let d=s==='__custom'?ov.querySelector('#d-custom').value.trim():s;
+      if(!d||p.days.includes(d))return;
+      if(s!=='__custom'){const ord=x=>{const k=ALL_DAYS.indexOf(x);return k<0?99:k};const idx=p.days.findIndex(x=>ord(x)>ord(d));idx<0?p.days.push(d):p.days.splice(idx,0,d)}else p.days.push(d);
+      re()};
+    ov.querySelector('#d-close').onclick=close;
+  };
+  modal('',draw);
+}
+
+/* ---------- data tools ---------- */
+const box=document.getElementById('dataBox');
+async function copyOut(obj,label){box.value=JSON.stringify(obj);try{await navigator.clipboard.writeText(box.value);toast('คัดลอก'+label+'แล้ว')}catch(e){box.focus();box.select();toast('เลือกข้อความไว้แล้ว กดคัดลอกเองได้เลย')}}
+document.getElementById('bExpOne').onclick=()=>copyOut(cur(),'ข้อมูลคนนี้');
+document.getElementById('bExpAll').onclick=()=>copyOut(state.people,'ข้อมูลทุกคน');
+document.getElementById('bImport').onclick=()=>{
+  let d;try{d=JSON.parse(box.value)}catch(e){toast('ข้อความไม่ใช่ข้อมูลตารางเรียน ลองคัดลอกใหม่อีกครั้ง');return}
+  const arr=Array.isArray(d)?d:d&&Array.isArray(d.people)?d.people:[d];
+  const ok=arr.filter(x=>x&&typeof x==='object'&&Array.isArray(x.classes));
+  if(!ok.length){toast('ไม่พบตารางเรียนในข้อความที่วาง');return}
+  ok.forEach(x=>{const p=person(x.name||'นำเข้า',x);p.id=uid();p.days=Array.isArray(x.days)?x.days:p.days;p.exams=Array.isArray(x.exams)?x.exams:[];
+    p.classes.forEach(c=>c.id=c.id||uid());p.exams.forEach(e=>e.id=e.id||uid());state.people.push(p);state.currentId=p.id});
+  box.value='';commit();toast('นำเข้า '+ok.length+' ตารางแล้ว');
+};
+document.getElementById('bDup').onclick=()=>{const p=JSON.parse(JSON.stringify(cur()));p.id=uid();p.name+=' (สำเนา)';state.people.push(p);state.currentId=p.id;commit();toast('ทำสำเนาแล้ว')};
+const bDel=document.getElementById('bDel');
+bDel.onclick=()=>{
+  if(!bDel.classList.contains('armed')){bDel.classList.add('armed');bDel.textContent='กดอีกครั้งเพื่อลบ “'+cur().name+'”';setTimeout(()=>{bDel.classList.remove('armed');bDel.textContent='ลบตารางของคนนี้'},3500);return}
+  const name=cur().name;state.people=state.people.filter(p=>p.id!==cur().id);
+  if(!state.people.length)state.people.push(person('คนใหม่',{advisor:''}));
+  state.currentId=state.people[0].id;bDel.classList.remove('armed');bDel.textContent='ลบตารางของคนนี้';commit();toast('ลบตารางของ '+name+' แล้ว');
+};
+
+render();
+</script>
+
+</body>
+</html>
