@@ -151,6 +151,11 @@ td.mid{vertical-align:middle}
 tr.grp td{background:var(--cell);font-family:var(--f-display);font-weight:600;text-align:center;color:var(--ink)}
 .mclash{font-size:.85rem;color:var(--danger);background:var(--bad-bg);border-radius:6px;padding:8px 10px}
 .mclash.ok{color:var(--ink);background:var(--ok-bg)}
+.sync{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--surface)}
+.sync::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.sync[data-s="live"]{color:var(--ok);border-color:var(--ok)} .sync[data-s="live"]::before{background:var(--ok)}
+.sync[data-s="error"]{color:var(--danger);border-color:var(--danger)} .sync[data-s="error"]::before{background:var(--danger)}
+.sync[data-s="connecting"]::before{background:var(--b-amber)}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:.9rem;z-index:60}
 @media (max-width:560px){
   .profile{grid-template-columns:1fr}
@@ -164,7 +169,7 @@ tr.grp td{background:var(--cell);font-family:var(--f-display);font-weight:600;te
 <div class="wrap">
   <div class="top">
     <h1>สมุดตารางเรียน</h1>
-    <p>แตะช่องว่างเพื่อเพิ่ม แตะช่องที่มีข้อมูลเพื่อแก้ไข</p>
+    <p>แตะช่องว่างเพื่อเพิ่ม แตะช่องที่มีข้อมูลเพื่อแก้ไข <span class="sync" id="sync" data-s="local">บันทึกในเครื่องนี้</span></p>
   </div>
 
   <div class="views" role="tablist">
@@ -186,7 +191,7 @@ tr.grp td{background:var(--cell);font-family:var(--f-display);font-weight:600;te
 
   <section class="card tools">
     <h3>สำรอง / ย้ายข้อมูล</h3>
-    <p class="note" style="margin:0">ข้อมูลบันทึกไว้ในเบราว์เซอร์เครื่องนี้อัตโนมัติ ถ้าจะย้ายเครื่องหรือส่งให้เพื่อน ให้คัดลอกข้อมูลไปวางในช่องนำเข้าอีกเครื่อง</p>
+    <p class="note" style="margin:0">ข้อมูลบันทึกอัตโนมัติ ถ้าเปิดผ่านเว็บที่ต่อฐานข้อมูลแล้ว (ป้ายด้านบนเป็นสีเขียว) ทุกคนจะเห็นข้อมูลชุดเดียวกันทันที ถ้าป้ายเป็นสีเทา ข้อมูลอยู่ในเครื่องนี้เท่านั้น ใช้ปุ่มด้านล่างคัดลอกไปวางที่อื่นได้</p>
     <div class="bar">
       <button class="btn" id="bExpOne">คัดลอกข้อมูลคนนี้</button>
       <button class="btn" id="bExpAll">คัดลอกข้อมูลทุกคน</button>
@@ -276,7 +281,7 @@ function seed(){
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.people)&&s.people.length)return s}catch(e){}return null}
 let state=load()||seed();
 if(!state.teach)state.teach=seedTeach();
-function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}schedulePush()}
 const cur=()=>state.people.find(p=>p.id===state.currentId)||state.people[0];
 function commit(){save();render()}
 function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
@@ -381,7 +386,7 @@ function renderExams(){
 function modal(html,bind){
   const root=document.getElementById('modalRoot');
   root.innerHTML=`<div class="ov"><div class="card modal" role="dialog" aria-modal="true">${html}</div></div>`;
-  const ov=root.firstChild,close=()=>{root.innerHTML='';document.removeEventListener('keydown',esc_)};
+  const ov=root.firstChild,close=()=>{root.innerHTML='';document.removeEventListener('keydown',esc_);setTimeout(tryFlush,0)};
   const esc_=e=>{if(e.key==='Escape')close()};document.addEventListener('keydown',esc_);
   ov.onclick=e=>{if(e.target===ov)close()};
   bind(ov,close);
@@ -643,6 +648,72 @@ function openSlot(s,preset){
   });
 }
 
+/* ---------- cloud sync (Supabase realtime) ---------- */
+const TABLE='schedule_docs',SUPA_CDN='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js';
+let cloud=null,pushTimer=null;const remoteQ=[];
+function setSync(st,msg){const el=document.getElementById('sync');el.dataset.s=st;
+  el.textContent={local:'บันทึกในเครื่องนี้',connecting:'กำลังเชื่อมต่อฐานข้อมูล…',live:'ออนไลน์ · อัปเดตเรียลไทม์',error:'เชื่อมต่อไม่ได้: '+(msg||'')}[st]||st;
+  el.title=st==='error'?'แก้ไขยังบันทึกในเครื่องนี้ จะส่งขึ้นฐานข้อมูลอีกครั้งเมื่อแก้ไขครั้งถัดไป':''}
+function rowsOf(){const m=new Map();state.people.forEach((p,i)=>m.set('p_'+p.id,{kind:'person',sort:i,data:p}));m.set('teach',{kind:'teach',sort:0,data:state.teach});return m}
+const sig=(sort,data)=>JSON.stringify([sort,data]);
+function schedulePush(ms=500){if(!cloud)return;clearTimeout(pushTimer);pushTimer=setTimeout(push,ms)}
+async function push(){
+  if(!cloud)return;clearTimeout(pushTimer);pushTimer=null;
+  const rows=rowsOf(),up=[],del=[],now=new Date().toISOString();
+  rows.forEach((r,id)=>{const j=sig(r.sort,r.data);if(cloud.synced.get(id)!==j){up.push({id,kind:r.kind,sort:r.sort,data:r.data,updated_at:now});cloud.synced.set(id,j)}});
+  [...cloud.synced.keys()].forEach(id=>{if(!rows.has(id)){del.push(id);cloud.synced.delete(id)}});
+  if(!up.length&&!del.length)return;
+  try{
+    if(up.length){const {error}=await cloud.sb.from(TABLE).upsert(up);if(error)throw error}
+    if(del.length){const {error}=await cloud.sb.from(TABLE).delete().in('id',del);if(error)throw error}
+    if(cloud.live)setSync('live');
+  }catch(e){up.forEach(r=>cloud.synced.delete(r.id));del.forEach(id=>cloud.synced.set(id,'__retry'));setSync('error',e.message||'บันทึกไม่สำเร็จ')}
+}
+function fixState(){
+  if(!state.people.length)state.people.push(person('คนใหม่',{advisor:''}));
+  if(!state.people.some(p=>p.id===state.currentId))state.currentId=state.people[0].id;
+  if(!state.teach)state.teach=seedTeach();
+}
+function applyRows(rows){
+  rows.forEach(r=>{cloud.synced.set(r.id,sig(r.sort,r.data));cloud.sort.set(r.id,r.sort);
+    if(r.kind==='teach')state.teach=r.data;
+    else{const i=state.people.findIndex(p=>p.id===r.data.id);if(i<0)state.people.push(r.data);else state.people[i]=r.data}});
+  state.people.sort((a,b)=>(cloud.sort.get('p_'+a.id)??1e9)-(cloud.sort.get('p_'+b.id)??1e9));
+}
+function busy(){const a=document.activeElement;return !!document.getElementById('modalRoot').firstChild||!!(a&&a.matches('input,textarea,select')&&a.closest('#vStudy,#vTeach'))}
+function onRemote(pl){remoteQ.push(pl);tryFlush()}
+function tryFlush(){
+  if(!cloud||!remoteQ.length||busy())return;
+  if(pushTimer)push();
+  const q=remoteQ.splice(0),rows=[];let changed=false;
+  q.forEach(pl=>{
+    if(pl.eventType==='DELETE'){const id=pl.old&&pl.old.id;if(!id||!cloud.synced.has(id))return;cloud.synced.delete(id);cloud.sort.delete(id);
+      if(id.startsWith('p_')){state.people=state.people.filter(p=>p.id!==id.slice(2));changed=true}}
+    else{const r=pl.new;if(!r||cloud.synced.get(r.id)===sig(r.sort,r.data))return;rows.push(r)}});
+  if(rows.length){applyRows(rows);changed=true}
+  if(changed){fixState();try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}render()}
+}
+document.addEventListener('focusout',()=>setTimeout(tryFlush,0));
+function loadScript(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error('โหลดไลบรารีไม่ได้'));document.head.appendChild(s)})}
+async function initCloud(){
+  let cfg;
+  try{const r=await fetch('/api/config',{cache:'no-store'});if(!r.ok)return;cfg=await r.json()}catch(e){return}
+  if(!cfg||!cfg.url||!cfg.anonKey)return;
+  setSync('connecting');
+  try{
+    if(!window.supabase)await loadScript(SUPA_CDN);
+    const sb=window.supabase.createClient(cfg.url,cfg.anonKey);
+    const {data,error}=await sb.from(TABLE).select('id,kind,sort,data');if(error)throw error;
+    cloud={sb,synced:new Map(),sort:new Map(),live:false};
+    if(data.length){
+      const keep=state.currentId;state.people=[];state.teach=null;applyRows(data);state.currentId=keep;fixState();
+      try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}render();
+    }else{await push();toast('สร้างข้อมูลเริ่มต้นในฐานข้อมูลแล้ว')}
+    sb.channel('schedule-docs').on('postgres_changes',{event:'*',schema:'public',table:TABLE},onRemote)
+      .subscribe(st=>{if(st==='SUBSCRIBED'){cloud.live=true;setSync('live')}else if(st==='CHANNEL_ERROR'||st==='TIMED_OUT'||st==='CLOSED'){cloud.live=false;setSync('error','การอัปเดตเรียลไทม์หลุด รีเฟรชหน้าเพื่อเชื่อมต่อใหม่')}});
+  }catch(e){cloud=null;setSync('error',e.message||'ไม่ทราบสาเหตุ')}
+}
+
 /* ---------- data tools ---------- */
 const box=document.getElementById('dataBox');
 async function copyOut(obj,label){box.value=JSON.stringify(obj);try{await navigator.clipboard.writeText(box.value);toast('คัดลอก'+label+'แล้ว')}catch(e){box.focus();box.select();toast('เลือกข้อความไว้แล้ว กดคัดลอกเองได้เลย')}}
@@ -672,6 +743,7 @@ bDel.onclick=()=>{
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 view=location.hash.slice(1)==='teach'?'teach':'study';
 render();
+initCloud();
 </script>
 
 </body>
