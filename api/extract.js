@@ -207,6 +207,27 @@ async function extractWithClaude(images) {
 }
 
 // ---------- try every model until one answers ----------
+// Every Gemini model name we know of, newest first. Names that no longer exist (or don't exist yet) answer
+// "not found" in a fraction of a second and are skipped. After these, the models the key reports are tried too.
+const GEMINI_MODELS = [
+  // aliases that always point at the current release
+  'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-pro-latest',
+  // Gemini 3.x
+  'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash',
+  'gemini-3-flash', 'gemini-3-flash-preview',
+  'gemini-3.1-flash-lite', 'gemini-3.1-flash-lite-preview',
+  'gemini-3.1-pro', 'gemini-3.1-pro-preview', 'gemini-3-pro', 'gemini-3-pro-preview',
+  // Gemini 2.5
+  'gemini-2.5-flash', 'gemini-2.5-flash-preview-09-2025', 'gemini-2.5-flash-lite', 'gemini-2.5-flash-lite-preview-09-2025', 'gemini-2.5-pro',
+  // Gemini 2.0
+  'gemini-2.0-flash', 'gemini-2.0-flash-001', 'gemini-2.0-flash-lite', 'gemini-2.0-flash-lite-001', 'gemini-2.0-flash-exp',
+  // Gemini 1.5
+  'gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-flash-002', 'gemini-1.5-flash-8b', 'gemini-1.5-flash-8b-latest',
+  'gemini-1.5-pro', 'gemini-1.5-pro-latest', 'gemini-1.5-pro-002',
+  // Gemma (open models served by the Gemini API; these read images too)
+  'gemma-3-27b-it', 'gemma-3-12b-it', 'gemma-3-4b-it', 'gemma-3n-e4b-it',
+];
+
 const usable = (d) => d && d.is_timetable && Array.isArray(d.classes) && d.classes.length > 0;
 
 async function extract(images, env) {
@@ -220,7 +241,7 @@ async function extract(images, env) {
     const key = env.GEMINI_API_KEY;
     const preferred = (env.GEMINI_MODEL || 'gemini-flash-latest').split(',').map((m) => m.trim()).filter(Boolean);
     let listed = null;
-    const queue = [...preferred];
+    const queue = [...preferred, ...GEMINI_MODELS];
     const tried = new Set();
     let busyRetried = false;
     while (queue.length && timeLeft() > 8000) {
@@ -241,6 +262,7 @@ async function extract(images, env) {
         errors.push(new AIError(422, 'ไม่พบตารางเรียนในรูป ลองใช้รูปที่เห็นตารางชัด ๆ', `${model}: ${data?.notes || 'no classes'}`));
       } catch (err) {
         const e = err instanceof AIError ? err : new AIError(502, 'เชื่อมต่อ Gemini ไม่ได้ ลองใหม่อีกครั้ง', `${model}: ${err?.message || err}`);
+        if (/\(404\)/.test(e.error)) continue; // this model name doesn't exist for this key; try the next one
         console.warn('Gemini failed', e.status, e.detail);
         errors.push(e);
         if (e.fatal) break;
