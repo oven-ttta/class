@@ -284,6 +284,15 @@ td.act{white-space:nowrap;text-align:right}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (max-width:900px){.skside{flex-direction:row;overflow:hidden}.skside .skitem{flex:none;width:150px;border:1px solid var(--line);border-radius:8px}}
 @media (max-width:640px){.skrow{grid-template-columns:1fr 2fr}.skrow .sk:nth-child(n+3){display:none}}
+details.fold>summary{list-style:none;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;padding:0;color:var(--ink)}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold>summary::before{content:"";width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s;flex:none;margin-left:4px}
+details.fold[open]>summary::before{transform:rotate(45deg)}
+details.fold>summary:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:6px}
+details.fold>summary .fold-t{font-family:var(--f-display);font-weight:700;font-size:1.15rem;color:var(--accent)}
+details.fold>summary .fold-s{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
+details.fold>summary .fold-x{margin-left:auto;color:var(--muted);font-size:.82rem}
+details.fold .fold-b{display:flex;flex-direction:column;gap:16px;margin-top:14px}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:.9rem;z-index:60}
 @media (max-width:560px){
   .profile{grid-template-columns:1fr}
@@ -413,7 +422,7 @@ let state=load()||seed();
 if(!state.teach)state.teach=seedTeach();
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}schedulePush()}
 const cur=()=>state.people.find(p=>p.id===state.currentId)||state.people[0];
-function commit(){save();render();noteLocalChange()}
+function commit(){save();render()}
 function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
 
 /* ---------- render ---------- */
@@ -833,6 +842,11 @@ function renderTeach(){
   wrap.querySelectorAll('[data-sid]').forEach(b=>b.onclick=()=>openSlot(T.slots.find(s=>s.id===b.dataset.sid)));
   renderSubjects();renderTeachers();
 }
+function fold(key,title,summary,body){
+  const open=ui[key]??(innerWidth>=900);
+  return `<details class="fold" data-fold="${key}"${open?' open':''}><summary><span class="fold-t">${title}</span><span class="fold-s">${summary}</span><span class="fold-x">${open?'ซ่อน':'แสดง'}</span></summary><div class="fold-b">${body}</div></details>`;
+}
+function bindFold(el){el.querySelectorAll('details[data-fold]').forEach(d=>d.addEventListener('toggle',()=>{ui[d.dataset.fold]=d.open;saveUI();const x=d.querySelector('.fold-x');if(x)x.textContent=d.open?'ซ่อน':'แสดง'}))}
 function teacherOpts(sel){return `<option value="">— ไม่ระบุ —</option>`+TT().teachers.map(t=>`<option value="${t.id}"${t.id===sel?' selected':''}>${esc(t.name)}</option>`).join('')}
 function renderSubjects(){
   const T=TT(),el=document.getElementById('tSubjects');
@@ -852,7 +866,8 @@ function renderSubjects(){
     <td class="mid" data-label="จัดแล้ว"><span class="pill ${cls}">${fmtH(got)}/${need} คาบ</span></td>
     <td class="span2" data-label="ครูผู้สอน">${esc(tname(s))||'<span class="note">— ไม่ระบุ —</span>'}</td>
     <td class="mid act"><button class="btn edit sm" tabindex="-1">แก้ไข</button></td></tr>`};
-  el.innerHTML=`<div><div class="exam-h">รายวิชา ${esc(T.title)}</div></div>
+  const doneN=T.subjects.filter(s=>perWeek(s)&&placed(s)>=perWeek(s)).length;
+  el.innerHTML=fold('foldSub',`รายวิชา ${esc(T.title)}`,`${T.subjects.length} วิชา · จัดคาบครบแล้ว ${doneN}/${T.subjects.length}`,`
     <div class="filters">
       <input type="search" class="q" id="q-sub" data-ui="sq" value="${esc(ui.sq)}" placeholder="ค้นหารหัส ชื่อวิชา หรือครู" aria-label="ค้นหารายวิชา">
       <select class="q" id="f-stype" data-ui="stype" aria-label="ประเภทวิชา">${opt('stype','','ทุกประเภท')}${opt('stype','พื้นฐาน','รายวิชาพื้นฐาน')}${opt('stype','เพิ่มเติม','รายวิชาเพิ่มเติม')}</select>
@@ -867,8 +882,8 @@ function renderSubjects(){
     </tbody></table></div>
     <div class="bar"><span class="note">คาบต่อสัปดาห์คิดจาก ชม. ÷ 20 สัปดาห์ (60 ชม. = 3 คาบ, 20 ชม. = 1 คาบ)</span><span class="spacer"></span>
       <select class="small" id="ns-type" aria-label="ประเภทวิชาใหม่"><option>พื้นฐาน</option><option>เพิ่มเติม</option></select>
-      <button class="btn primary" id="ns-add">+ เพิ่มรายวิชา</button></div>`;
-  bindUI(el);
+      <button class="btn primary" id="ns-add">+ เพิ่มรายวิชา</button></div>`);
+  bindUI(el);bindFold(el);
   el.querySelectorAll('tr[data-sub]').forEach(tr=>{const o=()=>editSubject(sub(tr.dataset.sub));tr.onclick=o;tr.onkeydown=e=>{if(e.key==='Enter')o()}});
   el.querySelector('#ns-add').onclick=()=>editSubject(null,el.querySelector('#ns-type').value);
 }
@@ -891,7 +906,8 @@ function renderTeachers(){
   const pname=t=>{const p=state.people.find(x=>x.id===t.personId);return p?p.name:''};
   let list=info.filter(x=>hasQ(ui.teq,x.t.name,pname(x.t),...x.subs.map(s=>s.name)));
   list.sort({order:(a,b)=>a.i-b.i,name:(a,b)=>byStr(a.t.name,b.t.name),hours:(a,b)=>b.h-a.h||a.i-b.i,clash:(a,b)=>b.cl-a.cl||a.i-b.i}[ui.tesort]||((a,b)=>a.i-b.i));
-  el.innerHTML=`<div class="sheet-head"><div><div class="sheet-title">ครูผู้สอน</div>
+  const linkedN=T.teachers.filter(t=>state.people.some(p=>p.id===t.personId)).length,clashN=info.reduce((a,x)=>a+x.cl,0);
+  el.innerHTML=fold('foldTch','ครูผู้สอน',`${T.teachers.length} คน · เชื่อมตารางเรียนแล้ว ${linkedN} คน${clashN?` · <b style="color:var(--danger)">คาบชน ${clashN}</b>`:''}`,`<div class="sheet-head"><div>
       <p class="note" style="margin:0">เชื่อมครูแต่ละคนกับตารางเรียน (มหาลัย) ของคนนั้น เพื่อให้เช็คว่าคาบสอนชนกับเวลาเรียนไหม ครูที่ไม่ได้เรียน เช่น อาจารย์ประจำ ไม่ต้องเชื่อมก็ได้</p></div>
       <button class="btn primary" id="nt-add">+ เพิ่มครู</button></div>
     <div class="filters">
@@ -906,8 +922,8 @@ function renderTeachers(){
       <td class="mid" data-label="คาบ/สัปดาห์">${fmtH(h)}</td>
       <td class="mid" data-label="คาบที่ชน">${cl?`<span class="pill over">${cl}</span>`:'<span class="note">0</span>'}</td>
       <td class="mid act"><button class="btn edit sm" tabindex="-1">แก้ไข</button></td></tr>`).join('')||'<tr class="sum"><td colspan="6" class="note">ไม่พบครูที่ค้นหา</td></tr>'}
-    </tbody></table></div>`;
-  bindUI(el);
+    </tbody></table></div>`);
+  bindUI(el);bindFold(el);
   el.querySelectorAll('tr[data-tid]').forEach(tr=>{const o=()=>editTeacher(tch(tr.dataset.tid));tr.onclick=o;tr.onkeydown=e=>{if(e.key==='Enter')o()}});
   el.querySelector('#nt-add').onclick=()=>editTeacher(null);
 }
@@ -1220,9 +1236,8 @@ function openUpload(){
       m.querySelector('#u-back').onclick=()=>{st.step='pick';st.result=null;draw(ov,close)};
       m.querySelector('#u-cancel').onclick=close;
       m.querySelector('#u-save').onclick=()=>{
-        const how=' · อ่านจากรูปด้วย '+(st.kind==='ocr'?'OCR':'AI');
-        if(same&&st.mode==='replace'){const id=same.id;Object.assign(same,p,{id});state.currentId=id;notifyHints[id]=how}
-        else{state.people.push(p);state.currentId=p.id;notifyHints[p.id]=how}
+        if(same&&st.mode==='replace'){const id=same.id;Object.assign(same,p,{id});state.currentId=id}
+        else{state.people.push(p);state.currentId=p.id}
         Object.assign(ui,{pq:'',cq:'',cdate:''});saveUI();close();setView('study');commit();toast('บันทึกตารางของ '+st.name+' แล้ว')};
     }
     async function addFiles(files){
@@ -1267,64 +1282,14 @@ function openUpload(){
 
 function renderNotifyTools(){
   const el=document.getElementById('notifyBar');if(!el)return;
-  el.innerHTML=`<span class="note">แจ้งเตือน Discord: ${notifyOn()?'เปิดอยู่ ส่งสรุปเมื่อมีการแก้ไข คาบสอนชน และเตือนสอบทุกเช้า 08:00':'ยังไม่ได้ตั้งค่า DISCORD_WEBHOOK_URL ใน Vercel'}</span><span class="spacer"></span>${notifyOn()?'<button class="btn" id="bNotifyTest">ทดสอบส่งแจ้งเตือน</button>':''}`;
-  const b=el.querySelector('#bNotifyTest');b&&(b.onclick=async()=>{b.disabled=true;
-    try{const r=await fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'test'})});const j=await r.json().catch(()=>({}));toast(r.ok?'ส่งแล้ว ดูในห้อง Discord ได้เลย':(j.error||'ส่งไม่สำเร็จ'))}
-    catch(e){toast('ส่งไม่สำเร็จ ลองใหม่อีกครั้ง')}finally{b.disabled=false}});
+  el.innerHTML=`<span class="note">แจ้งเตือน Discord ก่อนเข้าเรียน 30 นาที: ${notifyOn()?'ตั้งค่า webhook แล้ว':'ยังไม่ได้ตั้งค่า DISCORD_WEBHOOK_URL ใน Vercel'}</span><span class="spacer"></span>${apiCfg?'<button class="btn" id="bRemindPreview">ดูรายการเตือนวันนี้</button>':''}`;
+  const b=el.querySelector('#bRemindPreview');b&&(b.onclick=async()=>{b.disabled=true;
+    try{const r=await fetch('/api/class-reminder?dry=1',{cache:'no-store'});const j=await r.json();
+      document.getElementById('dataBox').value=r.ok?`ตอนนี้: ${j.now}\n\n`+(j.today.length?j.today.join('\n'):'วันนี้ไม่มีคาบเรียน'):(j.error||'ดูรายการไม่ได้');
+      document.querySelector('details.tools').open=true}
+    catch(e){toast('ดูรายการไม่ได้ ลองใหม่อีกครั้ง')}finally{b.disabled=false}});
 }
-/* ---------- Discord notifications: summarise this device's edits (15 s batches) and new teaching clashes ---------- */
-let notifyBase=null,notifyTimer=null;const notifyHints={};
-const clone=o=>JSON.parse(JSON.stringify(o));
 const notifyOn=()=>!!(apiCfg&&apiCfg.notify);
-function clashMap(){const m=new Map();(state.teach?.slots||[]).forEach(s=>{const c=slotClashes(s);if(c.length)m.set(s.id+'|'+c.join('|'),{s,c})});return m}
-function notifySnapshot(){return {people:new Map(state.people.map(p=>[p.id,clone(p)])),teach:clone(state.teach),clashes:new Set(clashMap().keys())}}
-function noteLocalChange(){if(!notifyOn()||booting)return;if(!notifyBase)notifyBase=notifySnapshot();clearTimeout(notifyTimer);notifyTimer=setTimeout(flushNotify,15000)}
-// Edits that arrive from other people are theirs to report: fold them into the baseline.
-function absorbRemote(){if(!notifyBase)return;const pend=notifyTimer?diffLines():null;if(pend&&pend.changes.length)return;notifyBase=notifySnapshot()}
-const clsText=c=>`${c.code}${c.group?' กลุ่ม '+c.group:''} ${c.day} ${c.start}-${c.end}`;
-function diffLines(){
-  const B=notifyBase,changes=[],clashes=[];if(!B)return {changes,clashes};
-  const now=new Map(state.people.map(p=>[p.id,p]));
-  for(const [id,p] of now){const o=B.people.get(id);
-    if(!o){changes.push(`เพิ่มตารางของ ${p.name||'(ไม่มีชื่อ)'} (${p.classes.length} วิชา)${notifyHints[id]||''}`);continue}
-    const who=p.name||o.name;
-    if(o.name!==p.name)changes.push(`เปลี่ยนชื่อ ${o.name||'(ไม่มีชื่อ)'} เป็น ${p.name}`);
-    if(['status','faculty','program','advisor','year','term'].some(k=>o[k]!==p[k]))changes.push(`${who}: แก้ข้อมูลนักศึกษา`);
-    if(notifyHints[id]&&JSON.stringify(o.classes)!==JSON.stringify(p.classes)){changes.push(`${who}: อัปเดตตารางทั้งชุด (${p.classes.length} วิชา)${notifyHints[id]}`)}
-    else{const oc=new Map(o.classes.map(c=>[c.id,c]));
-      p.classes.forEach(c=>{const x=oc.get(c.id);if(!x)changes.push(`${who}: เพิ่ม ${clsText(c)}`);else if(JSON.stringify(x)!==JSON.stringify(c))changes.push(`${who}: แก้ ${clsText(c)}`);oc.delete(c.id)});
-      oc.forEach(c=>changes.push(`${who}: ลบ ${clsText(c)}`))}
-    const oe=JSON.stringify(o.exams),pe=JSON.stringify(p.exams);if(oe!==pe&&!notifyHints[id])changes.push(`${who}: แก้ตารางสอบ`);
-    if(o.days.join()!==p.days.join())changes.push(`${who}: เปลี่ยนวันที่แสดงเป็น ${p.days.join(' ')}`);
-  }
-  for(const [id,o] of B.people)if(!now.has(id))changes.push(`ลบตารางของ ${o.name||'(ไม่มีชื่อ)'}`);
-  const T=state.teach,OT=B.teach;
-  if(T&&OT){
-    const sl=s=>{const sb=sub(s.subjectId),t=tch(s.teacherId);return `${sb?sb.name:'(ไม่ระบุวิชา)'} ${s.day} ${s.start}-${s.end}${t?' ('+t.name+')':''}${s.room?' ห้อง '+s.room:''}`};
-    const os=new Map(OT.slots.map(s=>[s.id,s]));
-    T.slots.forEach(s=>{const x=os.get(s.id);if(!x)changes.push(`ตารางสอน: เพิ่มคาบ ${sl(s)}`);else if(JSON.stringify(x)!==JSON.stringify(s))changes.push(`ตารางสอน: แก้คาบ ${sl(s)}`);os.delete(s.id)});
-    os.forEach(s=>changes.push(`ตารางสอน: ลบคาบ ${OT.subjects.find(x=>x.id===s.subjectId)?.name||''} ${s.day} ${s.start}-${s.end}`.replace(/\s+/g,' ')));
-    if(OT.title!==T.title)changes.push(`ตารางสอน: เปลี่ยนชื่อเป็น ${T.title}`);
-    if(JSON.stringify(OT.subjects)!==JSON.stringify(T.subjects))changes.push('ตารางสอน: แก้รายวิชา');
-    if(JSON.stringify(OT.teachers)!==JSON.stringify(T.teachers))changes.push('ตารางสอน: แก้ข้อมูลครู');
-    for(const [k,{s,c}] of clashMap())if(!B.clashes.has(k))clashes.push(`${sl(s)}: ${c.join(' · ')}`);
-  }
-  return {changes,clashes};
-}
-function sendNotify(type,lines,keepalive){
-  if(lines.length>15)lines=[...lines.slice(0,14),`และอีก ${lines.length-14} รายการ`];
-  return fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,lines}),keepalive:!!keepalive}).catch(()=>{});
-}
-function flushNotify(keepalive){
-  clearTimeout(notifyTimer);notifyTimer=null;if(!notifyBase||!notifyOn())return;
-  const {changes,clashes}=diffLines();
-  if(changes.length)sendNotify('changes',changes,keepalive);
-  if(clashes.length)sendNotify('clash',clashes,keepalive);
-  Object.keys(notifyHints).forEach(k=>delete notifyHints[k]);
-  notifyBase=notifySnapshot();
-}
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&notifyTimer)flushNotify(true)});
-
 /* ---------- cloud sync (Supabase realtime) ---------- */
 const TABLE='schedule_docs',SUPA_CDN='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js';
 let cloud=null,pushTimer=null;const remoteQ=[];
@@ -1368,7 +1333,7 @@ function tryFlush(){
       if(id.startsWith('p_')){state.people=state.people.filter(p=>p.id!==id.slice(2));changed=true}}
     else{const r=pl.new;if(!r||cloud.synced.get(r.id)===sig(r.sort,r.data))return;rows.push(r)}});
   if(rows.length){applyRows(rows);changed=true}
-  if(changed){fixState();try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}render();absorbRemote()}
+  if(changed){fixState();try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}render()}
 }
 document.addEventListener('focusout',()=>setTimeout(tryFlush,0));
 function loadScript(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error('โหลดไลบรารีไม่ได้'));document.head.appendChild(s)})}
@@ -1421,7 +1386,7 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.data
 view=location.hash.slice(1)==='teach'?'teach':'study';
 render();
 // Leave the skeleton once the shared database has answered, or after 8 s show what this device has.
-Promise.race([initCloud().catch(()=>{}),new Promise(r=>setTimeout(r,8000))]).finally(()=>{if(!cloud&&document.getElementById('sync').dataset.s==='connecting')setSync('local');if(booting){booting=false;render()}notifyBase=notifySnapshot();renderNotifyTools()});
+Promise.race([initCloud().catch(()=>{}),new Promise(r=>setTimeout(r,8000))]).finally(()=>{if(!cloud&&document.getElementById('sync').dataset.s==='connecting')setSync('local');if(booting){booting=false;render()}renderNotifyTools()});
 </script>
 
 </body>
