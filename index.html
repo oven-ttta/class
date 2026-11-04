@@ -329,6 +329,7 @@ td.act{white-space:nowrap;text-align:right}
       <button class="btn" id="bDup">ทำสำเนาตารางนี้</button>
       <button class="btn danger" id="bDel">ลบตารางของคนนี้</button>
     </div>
+    <div class="bar" id="notifyBar"></div>
     <textarea class="data" id="dataBox" placeholder="ข้อมูลที่คัดลอกจะแสดงที่นี่ หรือวางข้อมูลที่ต้องการนำเข้าแล้วกด “นำเข้าจากข้อความที่วาง”"></textarea>
   </details>
 </div>
@@ -412,7 +413,7 @@ let state=load()||seed();
 if(!state.teach)state.teach=seedTeach();
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}schedulePush()}
 const cur=()=>state.people.find(p=>p.id===state.currentId)||state.people[0];
-function commit(){save();render()}
+function commit(){save();render();noteLocalChange()}
 function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
 
 /* ---------- render ---------- */
@@ -1219,8 +1220,9 @@ function openUpload(){
       m.querySelector('#u-back').onclick=()=>{st.step='pick';st.result=null;draw(ov,close)};
       m.querySelector('#u-cancel').onclick=close;
       m.querySelector('#u-save').onclick=()=>{
-        if(same&&st.mode==='replace'){const id=same.id;Object.assign(same,p,{id});state.currentId=id}
-        else{state.people.push(p);state.currentId=p.id}
+        const how=' · อ่านจากรูปด้วย '+(st.kind==='ocr'?'OCR':'AI');
+        if(same&&st.mode==='replace'){const id=same.id;Object.assign(same,p,{id});state.currentId=id;notifyHints[id]=how}
+        else{state.people.push(p);state.currentId=p.id;notifyHints[p.id]=how}
         Object.assign(ui,{pq:'',cq:'',cdate:''});saveUI();close();setView('study');commit();toast('บันทึกตารางของ '+st.name+' แล้ว')};
     }
     async function addFiles(files){
@@ -1262,6 +1264,66 @@ function openUpload(){
   };
   modal('',draw);
 }
+
+function renderNotifyTools(){
+  const el=document.getElementById('notifyBar');if(!el)return;
+  el.innerHTML=`<span class="note">แจ้งเตือน Discord: ${notifyOn()?'เปิดอยู่ ส่งสรุปเมื่อมีการแก้ไข คาบสอนชน และเตือนสอบทุกเช้า 08:00':'ยังไม่ได้ตั้งค่า DISCORD_WEBHOOK_URL ใน Vercel'}</span><span class="spacer"></span>${notifyOn()?'<button class="btn" id="bNotifyTest">ทดสอบส่งแจ้งเตือน</button>':''}`;
+  const b=el.querySelector('#bNotifyTest');b&&(b.onclick=async()=>{b.disabled=true;
+    try{const r=await fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'test'})});const j=await r.json().catch(()=>({}));toast(r.ok?'ส่งแล้ว ดูในห้อง Discord ได้เลย':(j.error||'ส่งไม่สำเร็จ'))}
+    catch(e){toast('ส่งไม่สำเร็จ ลองใหม่อีกครั้ง')}finally{b.disabled=false}});
+}
+/* ---------- Discord notifications: summarise this device's edits (15 s batches) and new teaching clashes ---------- */
+let notifyBase=null,notifyTimer=null;const notifyHints={};
+const clone=o=>JSON.parse(JSON.stringify(o));
+const notifyOn=()=>!!(apiCfg&&apiCfg.notify);
+function clashMap(){const m=new Map();(state.teach?.slots||[]).forEach(s=>{const c=slotClashes(s);if(c.length)m.set(s.id+'|'+c.join('|'),{s,c})});return m}
+function notifySnapshot(){return {people:new Map(state.people.map(p=>[p.id,clone(p)])),teach:clone(state.teach),clashes:new Set(clashMap().keys())}}
+function noteLocalChange(){if(!notifyOn()||booting)return;if(!notifyBase)notifyBase=notifySnapshot();clearTimeout(notifyTimer);notifyTimer=setTimeout(flushNotify,15000)}
+// Edits that arrive from other people are theirs to report: fold them into the baseline.
+function absorbRemote(){if(!notifyBase)return;const pend=notifyTimer?diffLines():null;if(pend&&pend.changes.length)return;notifyBase=notifySnapshot()}
+const clsText=c=>`${c.code}${c.group?' กลุ่ม '+c.group:''} ${c.day} ${c.start}-${c.end}`;
+function diffLines(){
+  const B=notifyBase,changes=[],clashes=[];if(!B)return {changes,clashes};
+  const now=new Map(state.people.map(p=>[p.id,p]));
+  for(const [id,p] of now){const o=B.people.get(id);
+    if(!o){changes.push(`เพิ่มตารางของ ${p.name||'(ไม่มีชื่อ)'} (${p.classes.length} วิชา)${notifyHints[id]||''}`);continue}
+    const who=p.name||o.name;
+    if(o.name!==p.name)changes.push(`เปลี่ยนชื่อ ${o.name||'(ไม่มีชื่อ)'} เป็น ${p.name}`);
+    if(['status','faculty','program','advisor','year','term'].some(k=>o[k]!==p[k]))changes.push(`${who}: แก้ข้อมูลนักศึกษา`);
+    if(notifyHints[id]&&JSON.stringify(o.classes)!==JSON.stringify(p.classes)){changes.push(`${who}: อัปเดตตารางทั้งชุด (${p.classes.length} วิชา)${notifyHints[id]}`)}
+    else{const oc=new Map(o.classes.map(c=>[c.id,c]));
+      p.classes.forEach(c=>{const x=oc.get(c.id);if(!x)changes.push(`${who}: เพิ่ม ${clsText(c)}`);else if(JSON.stringify(x)!==JSON.stringify(c))changes.push(`${who}: แก้ ${clsText(c)}`);oc.delete(c.id)});
+      oc.forEach(c=>changes.push(`${who}: ลบ ${clsText(c)}`))}
+    const oe=JSON.stringify(o.exams),pe=JSON.stringify(p.exams);if(oe!==pe&&!notifyHints[id])changes.push(`${who}: แก้ตารางสอบ`);
+    if(o.days.join()!==p.days.join())changes.push(`${who}: เปลี่ยนวันที่แสดงเป็น ${p.days.join(' ')}`);
+  }
+  for(const [id,o] of B.people)if(!now.has(id))changes.push(`ลบตารางของ ${o.name||'(ไม่มีชื่อ)'}`);
+  const T=state.teach,OT=B.teach;
+  if(T&&OT){
+    const sl=s=>{const sb=sub(s.subjectId),t=tch(s.teacherId);return `${sb?sb.name:'(ไม่ระบุวิชา)'} ${s.day} ${s.start}-${s.end}${t?' ('+t.name+')':''}${s.room?' ห้อง '+s.room:''}`};
+    const os=new Map(OT.slots.map(s=>[s.id,s]));
+    T.slots.forEach(s=>{const x=os.get(s.id);if(!x)changes.push(`ตารางสอน: เพิ่มคาบ ${sl(s)}`);else if(JSON.stringify(x)!==JSON.stringify(s))changes.push(`ตารางสอน: แก้คาบ ${sl(s)}`);os.delete(s.id)});
+    os.forEach(s=>changes.push(`ตารางสอน: ลบคาบ ${OT.subjects.find(x=>x.id===s.subjectId)?.name||''} ${s.day} ${s.start}-${s.end}`.replace(/\s+/g,' ')));
+    if(OT.title!==T.title)changes.push(`ตารางสอน: เปลี่ยนชื่อเป็น ${T.title}`);
+    if(JSON.stringify(OT.subjects)!==JSON.stringify(T.subjects))changes.push('ตารางสอน: แก้รายวิชา');
+    if(JSON.stringify(OT.teachers)!==JSON.stringify(T.teachers))changes.push('ตารางสอน: แก้ข้อมูลครู');
+    for(const [k,{s,c}] of clashMap())if(!B.clashes.has(k))clashes.push(`${sl(s)}: ${c.join(' · ')}`);
+  }
+  return {changes,clashes};
+}
+function sendNotify(type,lines,keepalive){
+  if(lines.length>15)lines=[...lines.slice(0,14),`และอีก ${lines.length-14} รายการ`];
+  return fetch('/api/notify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type,lines}),keepalive:!!keepalive}).catch(()=>{});
+}
+function flushNotify(keepalive){
+  clearTimeout(notifyTimer);notifyTimer=null;if(!notifyBase||!notifyOn())return;
+  const {changes,clashes}=diffLines();
+  if(changes.length)sendNotify('changes',changes,keepalive);
+  if(clashes.length)sendNotify('clash',clashes,keepalive);
+  Object.keys(notifyHints).forEach(k=>delete notifyHints[k]);
+  notifyBase=notifySnapshot();
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden'&&notifyTimer)flushNotify(true)});
 
 /* ---------- cloud sync (Supabase realtime) ---------- */
 const TABLE='schedule_docs',SUPA_CDN='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js';
@@ -1306,13 +1368,13 @@ function tryFlush(){
       if(id.startsWith('p_')){state.people=state.people.filter(p=>p.id!==id.slice(2));changed=true}}
     else{const r=pl.new;if(!r||cloud.synced.get(r.id)===sig(r.sort,r.data))return;rows.push(r)}});
   if(rows.length){applyRows(rows);changed=true}
-  if(changed){fixState();try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}render()}
+  if(changed){fixState();try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}render();absorbRemote()}
 }
 document.addEventListener('focusout',()=>setTimeout(tryFlush,0));
 function loadScript(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>no(new Error('โหลดไลบรารีไม่ได้'));document.head.appendChild(s)})}
 async function initCloud(){
   let cfg;
-  try{const r=await fetch('/api/config',{cache:'no-store'});if(!r.ok)return;cfg=await r.json();apiCfg={ai:cfg.ai!==false}}catch(e){return}
+  try{const r=await fetch('/api/config',{cache:'no-store'});if(!r.ok)return;cfg=await r.json();apiCfg={ai:cfg.ai!==false,notify:!!cfg.notify}}catch(e){return}
   if(!cfg||!cfg.url||!cfg.anonKey)return;
   setSync('connecting');
   try{
@@ -1359,7 +1421,7 @@ document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.data
 view=location.hash.slice(1)==='teach'?'teach':'study';
 render();
 // Leave the skeleton once the shared database has answered, or after 8 s show what this device has.
-Promise.race([initCloud().catch(()=>{}),new Promise(r=>setTimeout(r,8000))]).finally(()=>{if(!cloud&&document.getElementById('sync').dataset.s==='connecting')setSync('local');if(booting){booting=false;render()}});
+Promise.race([initCloud().catch(()=>{}),new Promise(r=>setTimeout(r,8000))]).finally(()=>{if(!cloud&&document.getElementById('sync').dataset.s==='connecting')setSync('local');if(booting){booting=false;render()}notifyBase=notifySnapshot();renderNotifyTools()});
 </script>
 
 </body>

@@ -12,5 +12,6 @@ export default function handler(req, res) {
     url: env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_URL,
     anonKey: env.SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_KEY,
     ai: Boolean(env.GEMINI_API_KEY || env.ANTHROPIC_API_KEY),
+    notify: Boolean(env.DISCORD_WEBHOOK_URL),
   }));
 }

@@ -1,5 +1,8 @@
 {
   "functions": {
     "api/extract.js": { "maxDuration": 120 }
-  }
+  },
+  "crons": [
+    { "path": "/api/exam-reminder", "schedule": "0 1 * * *" }
+  ]
 }
