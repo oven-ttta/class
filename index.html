@@ -293,6 +293,24 @@ details.fold>summary .fold-t{font-family:var(--f-display);font-weight:700;font-s
 details.fold>summary .fold-s{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
 details.fold>summary .fold-x{margin-left:auto;color:var(--muted);font-size:.82rem}
 details.fold .fold-b{display:flex;flex-direction:column;gap:16px;margin-top:14px}
+.pill.warn{background:color-mix(in srgb,var(--b-amber) 60%,var(--surface));border-color:var(--b-amber)}
+.pill.info{background:color-mix(in srgb,var(--b-sky) 60%,var(--surface));border-color:var(--b-sky)}
+.tally{display:flex;gap:6px;flex-wrap:wrap}
+.datebar input[type=date]{flex:0 1 180px}
+.cklist{display:flex;flex-direction:column}
+.ckrow{display:grid;grid-template-columns:3.6em minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line)}
+.cktime{font-variant-numeric:tabular-nums;color:var(--muted);font-weight:600;font-size:.88rem;line-height:1.3}
+.ckwho{display:flex;flex-direction:column;gap:2px;min-width:0;overflow-wrap:anywhere}
+.ckact{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.stbtns{display:inline-flex;gap:4px;flex-wrap:wrap}
+.stb{border:1px solid var(--line);border-radius:999px;padding:6px 12px;background:var(--surface);font-weight:500;min-height:36px;min-width:52px}
+.stb:hover{border-color:var(--muted)}
+.stb[aria-pressed="true"][data-k="present"]{background:var(--ok-bg);border-color:var(--ok);color:var(--ok);font-weight:700}
+.stb[aria-pressed="true"][data-k="late"]{background:color-mix(in srgb,var(--b-amber) 70%,var(--surface));border-color:var(--b-amber);font-weight:700}
+.stb[aria-pressed="true"][data-k="absent"]{background:var(--bad-bg);border-color:var(--danger);color:var(--danger);font-weight:700}
+.stb[aria-pressed="true"][data-k="leave"]{background:color-mix(in srgb,var(--b-sky) 70%,var(--surface));border-color:var(--b-sky);font-weight:700}
+.check{display:flex;flex-direction:column;gap:18px;min-width:0}
+@media (max-width:640px){.ckrow{grid-template-columns:2.8em minmax(0,1fr)}.ckact{grid-column:1/-1;justify-content:flex-start}.views{display:grid;grid-template-columns:1fr 1fr}}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:.9rem;z-index:60}
 @media (max-width:560px){
   .profile{grid-template-columns:1fr}
@@ -306,8 +324,10 @@ details.fold .fold-b{display:flex;flex-direction:column;gap:16px;margin-top:14px
 <header class="appbar"><div class="appbar-in">
   <h1>สมุดตารางเรียน</h1>
   <div class="views" role="tablist">
-    <button role="tab" id="tabStudy" data-view="study">ตารางเรียน (มหาลัย)</button>
-    <button role="tab" id="tabTeach" data-view="teach">ตารางสอนเด็ก</button>
+    <button role="tab" id="tabStudy" data-view="study">ตารางเรียน</button>
+    <button role="tab" id="tabTeach" data-view="teach">ตารางสอน</button>
+    <button role="tab" id="tabTCheck" data-view="teacher-check">เช็คชื่ออาจารย์</button>
+    <button role="tab" id="tabSCheck" data-view="student-check">เช็คชื่อนักเรียน</button>
   </div>
   <span class="sync" id="sync" data-s="connecting">กำลังโหลด…</span>
 </div></header>
@@ -325,6 +345,17 @@ details.fold .fold-b{display:flex;flex-direction:column;gap:16px;margin-top:14px
     <section class="card sheet" id="tSheet"></section>
     <section class="card sheet" id="tSubjects"></section>
     <section class="card sheet" id="tTeachers"></section>
+  </div>
+
+  <div id="vTCheck" class="check">
+    <section class="card sheet" id="tcSheet"></section>
+    <section class="card sheet" id="tcSum"></section>
+  </div>
+
+  <div id="vSCheck" class="check">
+    <section class="card sheet" id="scSheet"></section>
+    <section class="card sheet" id="scRoster"></section>
+    <section class="card sheet" id="scSum"></section>
   </div>
 
   <details class="card tools">
@@ -420,6 +451,8 @@ function seed(){
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&Array.isArray(s.people)&&s.people.length)return s}catch(e){}return null}
 let state=load()||seed();
 if(!state.teach)state.teach=seedTeach();
+if(!state.roster)state.roster={students:[]};
+if(!state.att)state.att={};
 function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}schedulePush()}
 const cur=()=>state.people.find(p=>p.id===state.currentId)||state.people[0];
 function commit(){save();render()}
@@ -427,7 +460,9 @@ function toast(msg){const t=document.createElement('div');t.className='toast';t.
 
 /* ---------- render ---------- */
 let view='study';
-function setView(v){view=v==='teach'?'teach':'study';try{if(location.hash.slice(1)!==view)history.replaceState(null,'','#'+view)}catch(e){}render()}
+const VIEWS={study:['vStudy','tabStudy'],teach:['vTeach','tabTeach'],'teacher-check':['vTCheck','tabTCheck'],'student-check':['vSCheck','tabSCheck']};
+function showView(){for(const [k,[v,t]] of Object.entries(VIEWS)){document.getElementById(v).hidden=view!==k;document.getElementById(t).setAttribute('aria-selected',view===k)}}
+function setView(v){view=VIEWS[v]?v:'study';try{if(location.hash.slice(1)!==view)history.replaceState(null,'','#'+view)}catch(e){}render()}
 window.addEventListener('hashchange',()=>setView(location.hash.slice(1)));
 let booting=true;
 const SK=(cls,style='')=>`<span class="sk ${cls}"${style?` style="${style}"`:''}></span>`;
@@ -443,8 +478,9 @@ function skGrid(){
 const skRows=n=>Array.from({length:n},(_,i)=>`<div class="skrow">${SK('','width:80%')}${SK('',`width:${60+(i*17)%35}%`)}${SK('','width:40%')}${SK('','width:85%')}${SK('','width:85%')}</div>`).join('');
 function skHead(){return `<div class="sheet-head"><div style="display:flex;flex-direction:column;gap:8px">${SK('sk-line','width:220px')}${SK('sk-title')}${SK('sk-line','width:180px')}</div><div class="head-actions">${SK('sk-btn')}${SK('sk-btn')}</div></div>`}
 function renderSkeleton(){
-  document.getElementById('vStudy').hidden=view!=='study';document.getElementById('vTeach').hidden=view!=='teach';
-  document.getElementById('tabStudy').setAttribute('aria-selected',view==='study');document.getElementById('tabTeach').setAttribute('aria-selected',view==='teach');
+  showView();
+  ['tcSheet','scSheet'].forEach(id=>{document.getElementById(id).innerHTML=skHead()+`<div class="filters">${SK('sk-input','width:260px')}</div>`+skRows(6)});
+  ['tcSum','scRoster','scSum'].forEach(id=>{document.getElementById(id).innerHTML=SK('sk-line','width:220px;height:18px')});
   const filters=`<div class="filters">${SK('sk-input','flex:1 1 200px')}${SK('sk-input','width:160px')}${SK('sk-input','width:130px')}</div>`;
   document.getElementById('people').innerHTML=`<span class="sr" role="status">กำลังโหลดตารางเรียน…</span><div class="side-h">${SK('sk-line','width:110px;height:16px')}${SK('sk-line','width:36px')}</div>${SK('sk-input')}${SK('sk-input')}
     <div class="plist skside">${Array.from({length:4},(_,i)=>`<div class="skitem">${SK('sk-line',`width:${70+(i*13)%25}%;height:14px`)}${SK('sk-line','width:55%;height:10px')}</div>`).join('')}</div>${SK('sk-btn','width:100%')}`;
@@ -458,10 +494,9 @@ function renderSkeleton(){
 function render(){
   if(booting)return renderSkeleton();
   document.querySelector('.wrap').removeAttribute('aria-busy');
-  document.getElementById('vStudy').hidden=view!=='study';document.getElementById('vTeach').hidden=view!=='teach';
-  document.getElementById('tabStudy').setAttribute('aria-selected',view==='study');document.getElementById('tabTeach').setAttribute('aria-selected',view==='teach');
+  showView();
   const a=document.activeElement,aid=a&&a.id,sel=a&&a.type==='search'?[a.selectionStart,a.selectionEnd]:null;
-  renderPeople();renderSheet();renderExams();renderTeach();
+  renderPeople();renderSheet();renderExams();renderTeach();renderTCheck();renderSCheck();
   if(aid){const n=document.getElementById(aid);if(n&&n!==a){n.focus({preventScroll:true});if(sel)try{n.setSelectionRange(sel[0],sel[1])}catch(e){}}}}
 /* ---------- per-viewer view settings (search, sort, filter, layout) ---------- */
 const UIKEY=KEY+'-ui';
@@ -632,6 +667,141 @@ function renderExams(){
   bindUI(el);
   el.querySelectorAll('tr.er').forEach(r=>{const o=()=>openExam(p.exams.find(e=>e.id===r.dataset.eid));r.onclick=o;r.onkeydown=ev=>{if(ev.key==='Enter')o()}});
   el.querySelector('#bAddExam').onclick=()=>openExam(null);
+}
+
+/* ---------- attendance: teachers per teaching period, students per day or per period ---------- */
+const WEEK=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+const isoDay=iso=>WEEK[new Date(iso+'T00:00').getDay()];
+const thaiDate=iso=>{const d=new Date(iso+'T00:00');return `${isoDay(iso)} ${d.getDate()} ${TH_M[d.getMonth()]} ${d.getFullYear()+543}`};
+const shiftDay=(iso,n)=>{const d=new Date(iso+'T00:00');d.setDate(d.getDate()+n);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+const nowHM=()=>{const d=new Date();return pad(d.getHours())+':'+pad(d.getMinutes())};
+const T_ST=[['present','มาสอน'],['late','สาย'],['absent','ไม่มา'],['leave','ลา']];
+const S_ST=[['present','มา'],['late','สาย'],['absent','ขาด'],['leave','ลา']];
+function attDoc(date,create){let d=state.att[date];if(!d&&create){d=state.att[date]={date,teachers:{},students:{}}}return d}
+function stButtons(group,id,cur,labels){return `<div class="stbtns" role="group">${labels.map(([k,l])=>`<button class="stb" data-${group}="${id}" data-k="${k}" aria-pressed="${cur===k}">${l}</button>`).join('')}</div>`}
+function dateBar(key){
+  const date=ui[key]||isoToday();
+  return `<div class="filters datebar"><button class="btn" data-shift="-1" aria-label="วันก่อนหน้า">‹</button>
+    <input type="date" class="q" id="d-${key}" data-ui="${key}" value="${esc(date)}" aria-label="วันที่">
+    <button class="btn" data-shift="1" aria-label="วันถัดไป">›</button>
+    ${date===isoToday()?'<span class="pill done">วันนี้</span>':'<button class="btn" data-today="1">กลับไปวันนี้</button>'}</div>`;
+}
+function bindDateBar(el,key){
+  el.querySelectorAll('[data-shift]').forEach(b=>b.onclick=()=>setUI(key,shiftDay(ui[key]||isoToday(),+b.dataset.shift)));
+  const t=el.querySelector('[data-today]');t&&(t.onclick=()=>setUI(key,isoToday()));
+}
+const countBy=(obj,keys)=>{const c=Object.fromEntries(keys.map(k=>[k,0]));Object.values(obj||{}).forEach(v=>{const s=typeof v==='string'?v:v&&v.s;if(s in c)c[s]++});return c};
+const monthOf=iso=>iso.slice(0,7);
+const monthName=iso=>{const d=new Date(iso+'T00:00');return `${TH_M[d.getMonth()]} ${d.getFullYear()+543}`};
+
+/* ----- teachers ----- */
+function renderTCheck(){
+  const T=TT(),el=document.getElementById('tcSheet'),date=ui.tcDate||isoToday(),day=isoDay(date);
+  const slots=T.slots.filter(s=>s.day===day).sort((a,b)=>toMin(a.start)-toMin(b.start));
+  const rec=attDoc(date)?.teachers||{},c=countBy(Object.fromEntries(slots.map(s=>[s.id,rec[s.id]]).filter(x=>x[1])),T_ST.map(x=>x[0]));
+  const done=slots.filter(s=>rec[s.id]).length;
+  el.innerHTML=`<div class="sheet-head"><div><div class="eyebrow">เช็คชื่ออาจารย์เข้าสอน</div><h2 class="pname">${esc(thaiDate(date))}</h2>
+      <div class="stats">${slots.length} คาบ · เช็คแล้ว ${done}/${slots.length}</div></div></div>
+    ${dateBar('tcDate')}
+    ${slots.length?`<div class="tally"><span class="pill done">มาสอน ${c.present}</span><span class="pill warn">สาย ${c.late}</span><span class="pill over">ไม่มา ${c.absent}</span><span class="pill info">ลา ${c.leave}</span><span class="pill">ยังไม่เช็ค ${slots.length-done}</span></div>`:''}
+    <div class="cklist">${slots.map(s=>{const sb=sub(s.subjectId),t=tch(s.teacherId),r=rec[s.id]||{};
+      return `<div class="ckrow"><div class="cktime">${esc(s.start)}<br>${esc(s.end)}</div>
+        <div class="ckwho"><b><span class="dot" style="background:var(--b-${esc(t?t.color:'slate')})"></span>${esc(t?t.name:'(ไม่ระบุครู)')}</b>
+          <span>${esc(sb?subLabel(sb):'(ไม่ระบุวิชา)')}${s.room?' · ห้อง '+esc(s.room):''}</span>
+          ${r.s?`<span class="note">${r.at?'บันทึกเวลา '+esc(r.at):''}${r.note?(r.at?' · ':'')+esc(r.note):''}</span>`:''}</div>
+        <div class="ckact">${stButtons('tc',s.id,r.s,T_ST)}<button class="btn edit sm" data-tnote="${s.id}">หมายเหตุ</button></div></div>`}).join('')
+      ||`<div class="status"><b>วัน${esc(day)}ไม่มีคาบสอน</b><span class="note">เพิ่มคาบสอนได้ที่แท็บ “ตารางสอน” แล้วกลับมาเช็คชื่อที่นี่</span></div>`}</div>`;
+  bindUI(el);bindDateBar(el,'tcDate');
+  el.querySelectorAll('[data-tc]').forEach(b=>b.onclick=()=>{const id=b.dataset.tc,k=b.dataset.k,d=attDoc(date,true),old=d.teachers[id];
+    if(old&&old.s===k)delete d.teachers[id];else d.teachers[id]={...old,s:k,at:old?.at||(date===isoToday()&&(k==='present'||k==='late')?nowHM():'')};commit()});
+  el.querySelectorAll('[data-tnote]').forEach(b=>b.onclick=()=>{const id=b.dataset.tnote,r=attDoc(date)?.teachers?.[id]||{};
+    openForm({title:'หมายเหตุการเข้าสอน',fields:[
+      {k:'s',label:'สถานะ',type:'select',value:r.s||'',options:[['','— ยังไม่เช็ค —'],...T_ST]},
+      {k:'at',label:'เวลาที่เข้าสอน',value:r.at||'',placeholder:'เช่น 08:05'},
+      {k:'note',label:'หมายเหตุ',value:r.note||'',full:true,placeholder:'เช่น สอนแทนโดย…, ลากิจ'}],
+      onSave:v=>{const d=attDoc(date,true);if(!v.s&&!v.note&&!v.at)delete d.teachers[id];else d.teachers[id]=v;commit();toast('บันทึกแล้ว')}})});
+  renderTCheckSummary(date);
+}
+function renderTCheckSummary(date){
+  const T=TT(),el=document.getElementById('tcSum'),m=monthOf(date);
+  const rows=T.teachers.map(t=>{const c={present:0,late:0,absent:0,leave:0};
+    Object.values(state.att).filter(d=>monthOf(d.date)===m).forEach(d=>Object.entries(d.teachers||{}).forEach(([sid,r])=>{const s=T.slots.find(x=>x.id===sid);if(s&&s.teacherId===t.id&&r.s in c)c[r.s]++}));
+    return {t,c,n:c.present+c.late+c.absent+c.leave}});
+  el.innerHTML=fold('foldTcSum',`สรุปการเข้าสอน ${monthName(date)}`,`ครู ${T.teachers.length} คน`,`<div class="scroll"><table class="cards"><thead><tr><th>ครู</th><th>มาสอน</th><th>สาย</th><th>ไม่มา</th><th>ลา</th><th>มาสอน %</th></tr></thead><tbody>
+    ${rows.map(({t,c,n})=>`<tr><td class="wide" data-label="ครู"><span class="dot" style="background:var(--b-${esc(t.color)})"></span><b>${esc(t.name)}</b></td><td data-label="มาสอน">${c.present}</td><td data-label="สาย">${c.late}</td><td data-label="ไม่มา">${c.absent}</td><td data-label="ลา">${c.leave}</td><td data-label="มาสอน %">${n?Math.round((c.present+c.late)/n*100)+'%':'—'}</td></tr>`).join('')}
+    </tbody></table></div><p class="note" style="margin:0">นับจากคาบที่เช็คแล้วในเดือนนี้ (สายนับว่ามาสอน)</p>`);
+  bindFold(el);
+}
+
+/* ----- students ----- */
+const rosterSorted=()=>[...state.roster.students].sort((a,b)=>(+a.no||1e9)-(+b.no||1e9)||byStr(a.name,b.name));
+function renderSCheck(){
+  const T=TT(),el=document.getElementById('scSheet'),date=ui.scDate||isoToday(),day=isoDay(date);
+  const slots=T.slots.filter(s=>s.day===day).sort((a,b)=>toMin(a.start)-toMin(b.start));
+  const sessions=[['day','เช็คชื่อเช้า (ทั้งวัน)'],...slots.map(s=>{const sb=sub(s.subjectId);return [s.id,`คาบ ${s.start}-${s.end} ${sb?sb.name:''}`]})];
+  const session=sessions.some(x=>x[0]===ui.scSession)?ui.scSession:'day';
+  const rec=attDoc(date)?.students?.[session]||{},all=rosterSorted();
+  const list=all.filter(s=>hasQ(ui.scq,s.no,s.name,s.nick));
+  const c=countBy(Object.fromEntries(all.map(s=>[s.id,rec[s.id]]).filter(x=>x[1])),S_ST.map(x=>x[0])),done=all.filter(s=>rec[s.id]).length;
+  el.innerHTML=`<div class="sheet-head"><div><div class="eyebrow">เช็คชื่อนักเรียน</div><h2 class="pname">${esc(thaiDate(date))}</h2>
+      <div class="stats">นักเรียน ${all.length} คน · เช็คแล้ว ${done}/${all.length}</div></div>
+      <div class="head-actions"><button class="btn" id="sc-clear"${done?'':' disabled'}>ล้างการเช็ค</button><button class="btn primary" id="sc-all"${all.length&&done<all.length?'':' disabled'}>ที่เหลือมาครบ</button></div></div>
+    ${dateBar('scDate')}
+    <div class="filters"><select class="q" id="sc-session" data-ui="scSession" aria-label="เช็คชื่อรอบไหน">${sessions.map(([v,l])=>`<option value="${esc(v)}"${v===session?' selected':''}>${esc(l)}</option>`).join('')}</select>
+      <input type="search" class="q" id="q-sc" data-ui="scq" value="${esc(ui.scq)}" placeholder="ค้นหาเลขที่ ชื่อ หรือชื่อเล่น" aria-label="ค้นหานักเรียน"></div>
+    ${all.length?`<div class="tally"><span class="pill done">มา ${c.present}</span><span class="pill warn">สาย ${c.late}</span><span class="pill over">ขาด ${c.absent}</span><span class="pill info">ลา ${c.leave}</span><span class="pill">ยังไม่เช็ค ${all.length-done}</span></div>`:''}
+    <div class="cklist">${list.map(s=>`<div class="ckrow"><div class="cktime">${esc(s.no||'—')}</div>
+        <div class="ckwho"><b>${esc(s.name)}</b>${s.nick?`<span>${esc(s.nick)}</span>`:''}</div>
+        <div class="ckact">${stButtons('sc',s.id,rec[s.id],S_ST)}</div></div>`).join('')
+      ||(all.length?'<div class="note">ไม่พบนักเรียนที่ค้นหา</div>':`<div class="status"><b>ยังไม่มีรายชื่อนักเรียน</b><span class="note">เพิ่มทีละคน หรือวางรายชื่อทั้งห้องได้ในส่วน “รายชื่อนักเรียน” ด้านล่าง</span></div>`)}</div>`;
+  bindUI(el);bindDateBar(el,'scDate');
+  const put=fn=>{const d=attDoc(date,true);d.students[session]=d.students[session]||{};fn(d.students[session]);if(!Object.keys(d.students[session]).length)delete d.students[session];commit()};
+  el.querySelectorAll('[data-sc]').forEach(b=>b.onclick=()=>put(r=>{const id=b.dataset.sc,k=b.dataset.k;if(r[id]===k)delete r[id];else r[id]=k}));
+  el.querySelector('#sc-all').onclick=()=>put(r=>all.forEach(s=>{if(!r[s.id])r[s.id]='present'}));
+  const clr=el.querySelector('#sc-clear');armDelete(clr,()=>put(r=>Object.keys(r).forEach(k=>delete r[k])));clr.textContent='ล้างการเช็ค';
+  renderRoster();renderSCheckSummary(date);
+}
+function editStudent(s){
+  const isNew=!s,d=s||{no:String((Math.max(0,...state.roster.students.map(x=>+x.no||0)))+1),name:'',nick:''};
+  openForm({title:isNew?'เพิ่มนักเรียน':'แก้ไขข้อมูลนักเรียน',saveLabel:isNew?'เพิ่ม':'บันทึก',fields:[
+    {k:'no',label:'เลขที่',type:'number',value:d.no},{k:'nick',label:'ชื่อเล่น',value:d.nick},
+    {k:'name',label:'ชื่อ-นามสกุล',value:d.name,full:true,required:true,placeholder:'เช่น ด.ช.สมชาย ใจดี'}],
+    onSave:v=>{v.no=String(v.no);if(isNew)state.roster.students.push({id:uid(),...v});else Object.assign(s,v);commit();toast(isNew?'เพิ่มนักเรียนแล้ว':'บันทึกแล้ว')},
+    onDelete:isNew?null:()=>{state.roster.students=state.roster.students.filter(x=>x.id!==s.id);commit();toast('ลบแล้ว')}});
+}
+function bulkStudents(){
+  modal(`<h2>วางรายชื่อนักเรียนหลายคน</h2><p class="note" style="margin:0">บรรทัดละหนึ่งคน ขึ้นต้นด้วยเลขที่ก็ได้ ใส่ชื่อเล่นในวงเล็บก็ได้ เช่น <b>1 ด.ช.สมชาย ใจดี (ชาย)</b></p>
+    <form class="form" id="bf"><label class="full">รายชื่อ<textarea id="b-text" rows="10" placeholder="1 ด.ช.สมชาย ใจดี (ชาย)&#10;2 ด.ญ.สมหญิง รักเรียน (หญิง)"></textarea></label>
+    <div class="actions full"><button type="button" class="btn" id="b-cancel">ยกเลิก</button><button class="btn primary">เพิ่มรายชื่อ</button></div></form>`,(ov,close)=>{
+    ov.querySelector('#b-cancel').onclick=close;
+    ov.querySelector('#bf').onsubmit=e=>{e.preventDefault();const added=[];
+      ov.querySelector('#b-text').value.split('\n').map(l=>l.trim()).filter(Boolean).forEach(l=>{
+        const m=l.match(/^(\d{1,3})[.)\s]+(.*)$/),rest=(m?m[2]:l).trim(),nk=rest.match(/[(（]([^)）]+)[)）]\s*$/);
+        const name=(nk?rest.slice(0,nk.index):rest).trim();if(!name)return;
+        added.push({id:uid(),no:m?m[1]:'',name,nick:nk?nk[1].trim():''})});
+      // Lines without a number continue after the highest number already used (in the class or in this paste).
+      let next=Math.max(0,...state.roster.students.map(x=>+x.no||0),...added.map(x=>+x.no||0));added.forEach(x=>{if(!x.no)x.no=String(++next)});
+      if(!added.length){toast('ไม่พบรายชื่อในข้อความ');return}
+      state.roster.students.push(...added);close();commit();toast(`เพิ่มนักเรียน ${added.length} คนแล้ว`)};
+  });
+}
+function renderRoster(){
+  const el=document.getElementById('scRoster'),all=rosterSorted();
+  el.innerHTML=fold('foldRoster','รายชื่อนักเรียน',`${all.length} คน`,`<div class="bar"><span class="note">แตะแถวเพื่อแก้ไขหรือลบ</span><span class="spacer"></span><button class="btn" id="st-bulk">วางรายชื่อหลายคน</button><button class="btn primary" id="st-add">+ เพิ่มนักเรียน</button></div>
+    <div class="scroll"><table class="cards"><thead><tr><th>เลขที่</th><th>ชื่อ-นามสกุล</th><th>ชื่อเล่น</th><th></th></tr></thead><tbody>
+    ${all.map(s=>`<tr class="er" data-stu="${s.id}" tabindex="0"><td data-label="เลขที่">${esc(s.no)}</td><td class="wide" data-label="ชื่อ-นามสกุล">${esc(s.name)}</td><td data-label="ชื่อเล่น">${esc(s.nick)||'<span class="note">—</span>'}</td><td class="act"><button class="btn edit sm" tabindex="-1">แก้ไข</button></td></tr>`).join('')||'<tr class="sum"><td colspan="4" class="note">ยังไม่มีรายชื่อ</td></tr>'}
+    </tbody></table></div>`);
+  bindFold(el);
+  el.querySelectorAll('tr[data-stu]').forEach(tr=>{const o=()=>editStudent(state.roster.students.find(s=>s.id===tr.dataset.stu));tr.onclick=o;tr.onkeydown=e=>{if(e.key==='Enter')o()}});
+  el.querySelector('#st-add').onclick=()=>editStudent(null);el.querySelector('#st-bulk').onclick=bulkStudents;
+}
+function renderSCheckSummary(date){
+  const el=document.getElementById('scSum'),m=monthOf(date),docs=Object.values(state.att).filter(d=>monthOf(d.date)===m);
+  const rows=rosterSorted().map(s=>{const c={present:0,late:0,absent:0,leave:0};docs.forEach(d=>Object.values(d.students||{}).forEach(r=>{if(r[s.id] in c)c[r[s.id]]++}));return {s,c,n:c.present+c.late+c.absent+c.leave}});
+  el.innerHTML=fold('foldScSum',`สรุปการมาเรียน ${monthName(date)}`,`${docs.length} วันที่มีการเช็ค`,`<div class="scroll"><table class="cards"><thead><tr><th>เลขที่</th><th>ชื่อ</th><th>มา</th><th>สาย</th><th>ขาด</th><th>ลา</th><th>มาเรียน %</th></tr></thead><tbody>
+    ${rows.map(({s,c,n})=>{const pct=n?Math.round((c.present+c.late)/n*100):null;return `<tr><td data-label="เลขที่">${esc(s.no)}</td><td class="wide" data-label="ชื่อ"><b>${esc(s.name)}</b>${s.nick?` <span class="note">(${esc(s.nick)})</span>`:''}</td><td data-label="มา">${c.present}</td><td data-label="สาย">${c.late}</td><td data-label="ขาด">${c.absent?`<span class="pill over">${c.absent}</span>`:0}</td><td data-label="ลา">${c.leave}</td><td data-label="มาเรียน %">${pct==null?'—':pct<80?`<span class="pill over">${pct}%</span>`:pct+'%'}</td></tr>`}).join('')||'<tr class="sum"><td colspan="7" class="note">ยังไม่มีรายชื่อนักเรียน</td></tr>'}
+    </tbody></table></div><p class="note" style="margin:0">นับทุกรอบที่เช็คในเดือนนี้ (เช็คเช้าและรายคาบ) สายนับว่ามาเรียน ต่ำกว่า 80% แสดงเป็นสีแดง</p>`);
+  bindFold(el);
 }
 
 /* ---------- modals ---------- */
@@ -1296,7 +1466,8 @@ let cloud=null,pushTimer=null;const remoteQ=[];
 function setSync(st,msg){const el=document.getElementById('sync');el.dataset.s=st;
   el.textContent={local:'บันทึกในเครื่องนี้',connecting:'กำลังเชื่อมต่อฐานข้อมูล…',live:'ออนไลน์ · อัปเดตเรียลไทม์',error:'เชื่อมต่อไม่ได้: '+(msg||'')}[st]||st;
   el.title=st==='error'?'แก้ไขยังบันทึกในเครื่องนี้ จะส่งขึ้นฐานข้อมูลอีกครั้งเมื่อแก้ไขครั้งถัดไป':''}
-function rowsOf(){const m=new Map();state.people.forEach((p,i)=>m.set('p_'+p.id,{kind:'person',sort:i,data:p}));m.set('teach',{kind:'teach',sort:0,data:state.teach});return m}
+function rowsOf(){const m=new Map();state.people.forEach((p,i)=>m.set('p_'+p.id,{kind:'person',sort:i,data:p}));m.set('teach',{kind:'teach',sort:0,data:state.teach});
+  m.set('roster',{kind:'roster',sort:0,data:state.roster});Object.values(state.att).forEach(d=>m.set('att_'+d.date,{kind:'attend',sort:0,data:d}));return m}
 const sig=(sort,data)=>JSON.stringify([sort,data]);
 function schedulePush(ms=500){if(!cloud)return;clearTimeout(pushTimer);pushTimer=setTimeout(push,ms)}
 async function push(){
@@ -1315,14 +1486,18 @@ function fixState(){
   if(!state.people.length)state.people.push(person('คนใหม่',{advisor:''}));
   if(!state.people.some(p=>p.id===state.currentId))state.currentId=state.people[0].id;
   if(!state.teach)state.teach=seedTeach();
+  if(!state.roster||!Array.isArray(state.roster.students))state.roster={students:[]};
+  if(!state.att||typeof state.att!=='object')state.att={};
 }
 function applyRows(rows){
   rows.forEach(r=>{cloud.synced.set(r.id,sig(r.sort,r.data));cloud.sort.set(r.id,r.sort);
     if(r.kind==='teach')state.teach=r.data;
-    else{const i=state.people.findIndex(p=>p.id===r.data.id);if(i<0)state.people.push(r.data);else state.people[i]=r.data}});
+    else if(r.kind==='roster')state.roster=r.data;
+    else if(r.kind==='attend'){if(r.data&&r.data.date)state.att[r.data.date]=r.data}
+    else if(r.kind==='person'&&r.data&&Array.isArray(r.data.classes)){const i=state.people.findIndex(p=>p.id===r.data.id);if(i<0)state.people.push(r.data);else state.people[i]=r.data}});
   state.people.sort((a,b)=>(cloud.sort.get('p_'+a.id)??1e9)-(cloud.sort.get('p_'+b.id)??1e9));
 }
-function busy(){const a=document.activeElement;return !!document.getElementById('modalRoot').firstChild||!!(a&&a.matches('input,textarea,select')&&!a.classList.contains('q')&&a.closest('#vStudy,#vTeach'))}
+function busy(){const a=document.activeElement;return !!document.getElementById('modalRoot').firstChild||!!(a&&a.matches('input,textarea,select')&&!a.classList.contains('q')&&a.closest('#vStudy,#vTeach,#vTCheck,#vSCheck'))}
 function onRemote(pl){remoteQ.push(pl);tryFlush()}
 function tryFlush(){
   if(!cloud||!remoteQ.length||busy())return;
@@ -1330,7 +1505,8 @@ function tryFlush(){
   const q=remoteQ.splice(0),rows=[];let changed=false;
   q.forEach(pl=>{
     if(pl.eventType==='DELETE'){const id=pl.old&&pl.old.id;if(!id||!cloud.synced.has(id))return;cloud.synced.delete(id);cloud.sort.delete(id);
-      if(id.startsWith('p_')){state.people=state.people.filter(p=>p.id!==id.slice(2));changed=true}}
+      if(id.startsWith('p_')){state.people=state.people.filter(p=>p.id!==id.slice(2));changed=true}
+      if(id.startsWith('att_')){delete state.att[id.slice(4)];changed=true}}
     else{const r=pl.new;if(!r||cloud.synced.get(r.id)===sig(r.sort,r.data))return;rows.push(r)}});
   if(rows.length){applyRows(rows);changed=true}
   if(changed){fixState();try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}render()}
@@ -1348,7 +1524,7 @@ async function initCloud(){
     const {data,error}=await sb.from(TABLE).select('id,kind,sort,data');if(error)throw error;
     cloud={sb,synced:new Map(),sort:new Map(),live:false};
     if(data.length){
-      const keep=state.currentId;state.people=[];state.teach=null;applyRows(data);state.currentId=keep;fixState();booting=false;
+      const keep=state.currentId;state.people=[];state.teach=null;state.roster=null;state.att={};applyRows(data);state.currentId=keep;fixState();booting=false;
       try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}render();
     }else{await push();toast('สร้างข้อมูลเริ่มต้นในฐานข้อมูลแล้ว')}
     sb.channel('schedule-docs').on('postgres_changes',{event:'*',schema:'public',table:TABLE},onRemote)
@@ -1360,7 +1536,7 @@ async function initCloud(){
 const box=document.getElementById('dataBox');
 async function copyOut(obj,label){box.value=JSON.stringify(obj);try{await navigator.clipboard.writeText(box.value);toast('คัดลอก'+label+'แล้ว')}catch(e){box.focus();box.select();toast('เลือกข้อความไว้แล้ว กดคัดลอกเองได้เลย')}}
 document.getElementById('bExpOne').onclick=()=>copyOut(cur(),'ข้อมูลคนนี้');
-document.getElementById('bExpAll').onclick=()=>copyOut({people:state.people,teach:state.teach},'ข้อมูลทุกคนและตารางสอน');
+document.getElementById('bExpAll').onclick=()=>copyOut({people:state.people,teach:state.teach,roster:state.roster,att:state.att},'ข้อมูลทั้งหมด');
 document.getElementById('bImport').onclick=()=>{
   let d;try{d=JSON.parse(box.value)}catch(e){toast('ข้อความไม่ใช่ข้อมูลตารางเรียน ลองคัดลอกใหม่อีกครั้ง');return}
   const arr=Array.isArray(d)?d:d&&Array.isArray(d.people)?d.people:[d];
@@ -1370,6 +1546,8 @@ document.getElementById('bImport').onclick=()=>{
   const idMap={};
   ok.forEach(x=>{const p=person(x.name||'นำเข้า',x);p.id=uid();idMap[x.id]=p.id;p.days=Array.isArray(x.days)?x.days:p.days;p.exams=Array.isArray(x.exams)?x.exams:[];
     p.classes.forEach(c=>c.id=c.id||uid());p.exams.forEach(e=>e.id=e.id||uid());state.people.push(p);state.currentId=p.id});
+  if(d&&d.roster&&Array.isArray(d.roster.students))state.roster=d.roster;
+  if(d&&d.att&&typeof d.att==='object')Object.assign(state.att,d.att);
   if(hasTeach){state.teach=d.teach;state.teach.teachers.forEach(t=>{if(t.personId)t.personId=idMap[t.personId]||(state.people.some(p=>p.id===t.personId)?t.personId:'')})}
   box.value='';commit();toast('นำเข้า '+ok.length+' ตาราง'+(hasTeach?' และตารางสอน':'')+'แล้ว');
 };
@@ -1383,7 +1561,7 @@ bDel.onclick=()=>{
 };
 
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
-view=location.hash.slice(1)==='teach'?'teach':'study';
+view=VIEWS[location.hash.slice(1)]?location.hash.slice(1):'study';
 render();
 // Leave the skeleton once the shared database has answered, or after 8 s show what this device has.
 Promise.race([initCloud().catch(()=>{}),new Promise(r=>setTimeout(r,8000))]).finally(()=>{if(!cloud&&document.getElementById('sync').dataset.s==='connecting')setSync('local');if(booting){booting=false;render()}renderNotifyTools()});
